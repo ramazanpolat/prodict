@@ -10,7 +10,7 @@ You can provide type hints and get auto-complete!
 
 # Examples
 
-![Image of Yaktocat](http://oi67.tinypic.com/14l2490.jpg)
+![auto code complete](http://oi67.tinypic.com/14l2490.jpg)
 
 
 # Limitations
