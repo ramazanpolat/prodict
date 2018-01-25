@@ -10,8 +10,7 @@ You can provide type hints and get auto-complete!
 
 # Examples
 
-![auto code complete](http://oi67.tinypic.com/14l2490.jpg)
-
+![auto code complete](/auto-complete1.png?raw=true "Auto complete in action!")
 
 # Limitations
 You cannot use names of dict methods as attribute names.
