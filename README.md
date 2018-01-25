@@ -9,6 +9,7 @@ Although there are number of modules doing this, Prodict does a little bit more.
 You can provide type hints and get auto-complete!
 
 Auto complete in action:
+
 ![auto code complete](/auto-complete1.png?raw=true "Auto complete in action!")
 
 # Examples
