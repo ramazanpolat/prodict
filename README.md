@@ -1,5 +1,5 @@
 # Prodict
-Prodict = Dictionary with IDE friendly(auto code completion), dot-accessible attributes
+Prodict = Dictionary with IDE friendly(auto code completion) and dot-accessible attributes
 
 # Motivation
 Ever wanted to use a `dict` like a class and access keys as attributes? Prodict does exactly this. 
