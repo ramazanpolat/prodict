@@ -26,6 +26,58 @@ turkey.name = 'Turkey'
 turkey.population = 79814871
 ```
 
+Example 2:
+```
+germany = Country(name='Germany', population=82175700, flag_colors=['black', 'red', 'yellow'])
+
+print(germany.flag_colors)  # ['black', 'red', 'yellow']
+print(type(germany.flag_colors)) # <class 'list'>
+```
+
+Example 3:
+```
+class Ram(Prodict):
+    capacity: int
+    unit: str
+    type: str
+    clock: int
+
+
+class Computer(Prodict):
+    name: str
+    cpu_cores: int
+    rams: List[Ram]
+
+    def total_ram(self):
+        return sum([ram.capacity for ram in self.rams])
+
+
+comp1 = Computer.from_dict({'name': 'My Computer', 'cpu_cores': 4})
+print(comp1)
+# {'name': 'My Computer', 'cpu_cores': 4}
+
+comp1.rams = []
+comp1.rams.append(Ram(capacity=8, unit='GB', type='DDR3', clock=2400))
+comp1.rams.append(Ram.from_dict({'capacity': 4, 'unit': 'GB', 'type': 'DDR3', 'clock': 2400}))
+
+print(comp1)
+# {
+#   'name': 'My Computer',
+#   'cpu_cores': 4, 
+#   'rams': [
+#       {'capacity': 8, 'unit': 'GB', 'type': 'DDR3', 'clock': 2400},
+#       {'capacity': 4, 'unit': 'GB', 'type': 'DDR3', 'clock': 2400}
+#   ]
+# }
+
+print(comp1.rams)
+#   [
+#       {'capacity': 8, 'unit': 'GB', 'type': 'DDR3', 'clock': 2400},
+#       {'capacity': 4, 'unit': 'GB', 'type': 'DDR3', 'clock': 2400}
+#   ]
+```
+
+
 # Limitations
 You cannot use names of dict methods as attribute names.
 
