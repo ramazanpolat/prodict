@@ -15,7 +15,7 @@ Auto complete in action:
 # Examples
 
 Example 1:
-```
+```python
 class Country(Prodict):
     name: str
     population: int
@@ -27,7 +27,7 @@ turkey.population = 79814871
 ```
 
 Example 2:
-```
+```python
 germany = Country(name='Germany', population=82175700, flag_colors=['black', 'red', 'yellow'])
 
 print(germany.flag_colors)  # ['black', 'red', 'yellow']
@@ -35,7 +35,7 @@ print(type(germany.flag_colors)) # <class 'list'>
 ```
 
 Example 3:
-```
+```python
 class Ram(Prodict):
     capacity: int
     unit: str
