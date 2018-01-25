@@ -79,5 +79,6 @@ print(comp1.rams)
 
 
 # Limitations
-You cannot use names of dict methods as attribute names.
+- You cannot use names of dict methods as attribute names.
+- Requires Python 3.6+
 
