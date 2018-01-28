@@ -10,8 +10,8 @@ setup(
                      'provide type hints and get auto-complete!',
     author='Ramazan Polat',
     author_email='ramazanpolat@gmail.com',
-    url='https://github.com/ramazanpolat/prodict',  # use the URL to the github repo
-    download_url='https://github.com/ramazanpolat/prodict/archive/v0.5.tar.gz',  # I'll explain this in a second
+    url='https://github.com/ramazanpolat/prodict',
+    download_url='https://pypi.python.org/pypi/prodict/0.6',
     keywords=['python3', 'typehinting', 'dynamic-props', 'dict', 'dictionary', 'auto-complete', 'auto-code-complete'],
     classifiers=[],
 )
