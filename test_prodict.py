@@ -5,10 +5,7 @@ import time
 
 from datetime import datetime
 
-from ramutils.prodict import Prodict
-from ramutils.sanelogger import SaneLogger
-
-log = SaneLogger('T', SaneLogger.TRACE)
+from prodict import Prodict
 
 tc = unittest.TestCase()
 
@@ -47,7 +44,6 @@ def test_has_attr():
     assert pd == {}
     assert pd.has_attr('int_key') is True
     assert pd.has_attr('undefined key') is False
-    log.passed()
 
 
 def test_dict_reserved_keys():
@@ -65,8 +61,6 @@ def test_attr_initial_value_is_none():
     assert pd.str_key is None
     assert pd.float_key is None
 
-    log.passed()
-
 
 def test_setting_and_getting_attrs():
     pd = SimpleKeyValue()
@@ -76,8 +70,6 @@ def test_setting_and_getting_attrs():
     assert pd.int_key == 1
     assert pd.str_key == 'str'
     assert pd.float_key == 1.23
-
-    log.passed()
 
 
 def test_setting_unannotated_keys():
@@ -89,8 +81,6 @@ def test_setting_unannotated_keys():
     assert pd.dynamic_int == 0
     assert pd.dynamic_str == 'dynamic_str_value'
     assert pd.dynamic_float == 0.123
-
-    log.passed()
 
 
 def test_default_values():
@@ -112,15 +102,12 @@ def test_default_values():
     assert pd.str_key == 'new'
     assert pd.float_key == 2.345
 
-    log.passed()
-
 
 def test_annotated_constructor():
     pd = SimpleKeyValue(int_key=0, str_key='str', float_key=1.234)
     print(pd)
     assert pd == {'int_key': 0, 'str_key': 'str', 'float_key': 1.234}
     assert set(pd.attr_names()) == {'int_key', 'str_key', 'float_key'}
-    log.passed()
 
 
 def test_dynamic_constructor():
@@ -131,8 +118,6 @@ def test_dynamic_constructor():
                   'dyn_float_key': 2.345}
     assert set(pd.attr_names()) == {'int_key', 'str_key', 'float_key'}
 
-    log.passed()
-
 
 def test_load_annotated_attrs_from_dict():
     sample_dict = {'int_key': 0, 'str_key': 'str value', 'float_key': 1.234}
@@ -140,7 +125,6 @@ def test_load_annotated_attrs_from_dict():
     assert pd.int_key == 0
     assert pd.str_key == 'str value'
     assert pd.float_key == 1.234
-    log.passed()
 
 
 def test_load_dynamic_attrs_from_dict():
@@ -149,20 +133,17 @@ def test_load_dynamic_attrs_from_dict():
     assert pd.dynamic_int == 0
     assert pd.dynamic_str == 'str value'
     assert pd.dynamic_float == 1.234
-    log.passed()
 
 
 def test_annotated_attr_names():
     pd = SimpleKeyValue()
     assert set(pd.attr_names()) == {'int_key', 'str_key', 'float_key'}
-    log.passed()
 
 
 def test_advanced_attr_names():
     pd = AdvancedKeyValue()
     assert pd == {}
     assert set(pd.attr_names()) == {'tuple_key', 'list_key', 'dict_key'}
-    log.passed()
 
 
 def test_setting_and_getting_advanced_attrs():
@@ -182,8 +163,6 @@ def test_setting_and_getting_advanced_attrs():
     print('pd.dict_key =', pd.dict_key)
     print('type(pd.dict_key) =', type(pd.dict_key))
 
-    log.passed()
-
 
 def test_list_annotation():
     pd = ListProdict()
@@ -198,8 +177,6 @@ def test_list_annotation():
     assert pd.li_int == [1, 2, 3]
     assert pd.li_str == ['a', 'b', 'c']
 
-    log.passed()
-
 
 def test_recursive_annotations1():
     r = Recursive()
@@ -213,8 +190,6 @@ def test_recursive_annotations1():
     assert r.prodict_key == {'a': 1}
     assert r.prodict_key.a == 1
     assert type(r.prodict_key) == Prodict
-
-    log.passed()
 
 
 def test_recursive_annotations2():
@@ -233,7 +208,6 @@ def test_recursive_annotations2():
     assert r.simple_key == {'int_key': 0, 'str_key': 'str', 'float_key': 1.234, 'dyna_key': 'dynamic_value'}
     assert set(r.simple_key.attr_names()) == {'int_key', 'str_key', 'float_key'}
     assert type(r.simple_key) == SimpleKeyValue
-    log.passed()
 
 
 def test_recursive_annotations3():
@@ -247,7 +221,6 @@ def test_recursive_annotations3():
 
     assert r.dynamic_prodict_attr == {'a': 1, 'b': 2, 'c': 3}
     assert type(r.dynamic_prodict_attr) == Prodict
-    log.passed()
 
 
 class AnyType(Prodict):
@@ -264,8 +237,6 @@ def test_any_type():
 
     at.b = (1, 2, 3)
     print(at.b)
-
-    log.passed()
 
 
 class Ram(Prodict):
@@ -358,16 +329,12 @@ def test_deep_recursion_from_dict():
     print("type(computer['rams']) =", type(computer['rams']))
     print("computer['rams'][0] =", computer['rams'][0])
 
-    log.passed()
-
 
 def test_bracket_access():
     pd = SimpleKeyValue()
     pd.str_key = 'str_value_123'
     assert pd['str_key'] == pd.str_key
     assert pd.get('str_key') == pd.str_key
-
-    log.passed()
 
 
 def test_null_assignment():
@@ -390,8 +357,6 @@ def test_null_assignment():
 
     pd.dynamic_str = None
     assert pd.dynamic_str is None
-
-    log.passed()
 
 
 def test_multiple_instances():
@@ -436,4 +401,4 @@ if __name__ == '__main__':
 
     end_time = datetime.now().timestamp()
 
-    log.pos('Whole test suite took {} seconds.'.format(end_time - start_time))
+    print('Whole test suite took {} seconds.'.format(end_time - start_time))

@@ -5,7 +5,7 @@ DICT_RESERVED_KEYS = vars(dict).keys()
 
 class Prodict(dict):
     """
-    Prodict = Dictionary with IDE friendly(auto code completion), dot-accessible attributes.
+    Prodict = Dictionary with IDE friendly(auto code completion), dot-accessible attributes and more.
     """
 
     def __init__(self, **kwargs):
