@@ -5,7 +5,7 @@ import time
 
 from datetime import datetime
 
-from prodict import Prodict
+from prodict.prodict import Prodict
 
 tc = unittest.TestCase()
 
