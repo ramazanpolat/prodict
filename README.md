@@ -107,5 +107,5 @@ print(type(comp1.rams[0]))  # <class 'Ram'> <-- Mind the type !
 - Requires Python 3.6+
 
 # Thanks
-I would like to thank to ![JetBrains](https://www.jetbrains.com/) for creating ![PyCharm](https://www.jetbrains.com/pycharm/), the IDE that made my life better.
+I would like to thank to [JetBrains](https://www.jetbrains.com/) for creating [PyCharm](https://www.jetbrains.com/pycharm/), the IDE that made my life better.
 
