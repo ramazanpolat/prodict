@@ -98,6 +98,8 @@ print(comp1.rams)
 #   {'capacity': 8, 'type': 'DDR3'}, 
 #   {'capacity': 12, 'type': 'DDR3', 'clock': 2400}
 # ]
+print(type(comp1.rams))  # <class 'list'>
+print(type(comp1.rams[0]))  # <class 'Ram'> <-- Mind the type !
 ```
 
 # Limitations
