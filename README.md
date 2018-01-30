@@ -78,7 +78,7 @@ class Computer(Prodict):
 comp1 = Computer.from_dict(
     {
         'name':
-        'My Computer',
+            'My Computer',
         'cpu_cores': 4,
         'rams': [
             {'capacity': 4,
