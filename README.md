@@ -41,7 +41,6 @@ class Country(Prodict):
     name: str
     population: int
 
-
 turkey = Country()
 turkey.name = 'Turkey'
 turkey.population = 79814871
@@ -56,8 +55,6 @@ germany = Country(name='Germany', population='82175700', flag_colors=['black', '
 print(germany.population)  # 82175700
 print(type(germany.population))  # <class 'int'> <-- The type is `int` !
 # If you don't want type conversion and still want to have auto code completion, use `Any` as type.
-
-
 print(germany.flag_colors)  # ['black', 'red', 'yellow']
 print(type(germany.population))  # <class 'int'>
 ```
@@ -70,7 +67,6 @@ class Ram(Prodict):
     type: str
     clock: int
 
-
 class Computer(Prodict):
     name: str
     cpu_cores: int
@@ -78,7 +74,6 @@ class Computer(Prodict):
 
     def total_ram(self):
         return sum([ram.capacity for ram in self.rams])
-
 
 comp1 = Computer.from_dict(
     {
