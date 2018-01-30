@@ -6,16 +6,37 @@ Ever wanted to use a `dict` like a class and access keys as attributes? Prodict 
 
 Although there are number of modules doing this, Prodict does a little bit more.
 
-You can provide type hints and get auto-complete!
+You can provide type hints and get auto code completion!
 
-Auto complete in action:
+With type hints, you also get recursive object instantiations, which will blow your mind.
 
-![auto code complete](/auto-complete1.png?raw=true "Auto complete in action!")
+You will never want to use `dict` again.
 
 # Examples
 
-Example 1:
+Example 0: Use is like regular dict, because **it IS** a dict
 ```python
+
+from prodict import Prodict
+
+p = Prodict(lang='Python', pros='Rocks!')
+print(p)  # {'lang': 'Python', 'pros': 'Rocks!'}
+
+p2 = Prodict.from_dict({'Hello': 'world'})
+
+print(p2)  # {'Hello': 'world'}
+
+print(issubclass(Prodict, dict))  # True
+
+print(isinstance(p, dict))  # True
+
+print(set(dir(dict)).issubset(dir(Prodict)))  # True
+
+
+```
+Example 1: Type hinting
+```python
+from prodict import Prodict
 class Country(Prodict):
     name: str
     population: int
@@ -25,6 +46,8 @@ turkey = Country()
 turkey.name = 'Turkey'
 turkey.population = 79814871
 ```
+
+![auto code complete](/auto-complete1.png?raw=true "Auto complete in action!")
 
 Example 2:
 ```python
