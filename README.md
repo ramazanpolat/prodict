@@ -14,7 +14,7 @@ You will never want to use `dict` again.
 
 # Examples
 
-Example 0: Use it like regular `dict`, because **it is** a dict
+Example 0: Use it like regular `dict`, because **it is** a dict.
 ```python
 
 from prodict import Prodict
@@ -34,7 +34,7 @@ print(set(dir(dict)).issubset(dir(Prodict)))  # True
 
 
 ```
-Example 1: Type hinting
+Example 1: Accessing keys as attributes and type hinting for auto completion.
 ```python
 from prodict import Prodict
 class Country(Prodict):
