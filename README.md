@@ -53,8 +53,8 @@ user = User.from_dict(user_json)
   1) A class with dynamic properties, without defining it beforehand.
 
 ```python
-p = Prodict()
-p.hi = 'there'
+j = Prodict()
+j.hi = 'there'
 ```
 
   2) Pass named arguments and all arguments will become properties.
