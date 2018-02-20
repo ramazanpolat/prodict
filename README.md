@@ -12,6 +12,98 @@ With type hints, you also get recursive object instantiations, which will blow y
 
 You will never want to use `dict` again.
 
+# Comparison with regular `dict`
+
+Without `Prodict`:
+```python
+class Post:
+    def __init(self, text, date):
+        self.text = text
+        self.date = date
+        
+class User:
+    def __init(self, user_id, user_name, posts):
+        self.user_id = user_id
+        self.user_name = user_name
+        self.posts:List[Post] = posts
+       
+user_json = requests.get("https://some.restservice.com/user/1").json()
+
+posts = [Post(post['text'], post['date']) for post in user_json['posts']]
+user = User(user_json['user_id'], user_json['user_name'], posts)
+```
+
+With `Prodict`:
+```python
+class Post(Prodict):
+    text: str
+    date: str
+        
+class User(Prodict):
+    user_id: int
+    user_name: str
+    posts:List[Post]
+       
+user_json = requests.get("https://some.restservice.com/user/1").json()
+user = User.from_dict(user_json)
+```
+
+# Features
+
+1) A class with dynamic properties, without defining it beforehand.
+
+```python
+p = Prodict()
+p.hi = 'there'
+```
+
+2) Pass named arguments and all arguments will become properties.
+
+```python
+p = Prodict(lang='Python', pros='Rocks!')
+print(p.lang)  # Python
+print(p.pros)  # Rocks!
+print(p)  # {'lang': 'Python', 'pros': 'Rocks!'}
+```
+
+3) Instantiate from a `dict`, get `dict` keys as properties
+```python
+p = Prodict.from_dict({'lang': 'Python', 'pros': 'Rocks!'})
+print(p.lang)   # Python
+p.another_property = 'this is dynamically added'
+```
+
+4) Pass a `dict` as argument, get a nested `Prodict`!
+```python
+p = Prodict(package='Prodict', makes='Python', rock={'even': 'more!'})
+print(p)  #  {'package': 'Prodict', 'makes': 'Python', 'rock': {'even': 'more!'}}
+print(type(p.rock))  # <class 'prodict.Prodict'>
+```
+
+5) Extend `Prodict` and use type annotations for auto type conversion and auto code completion
+```python
+class User(Prodict):
+    user_id: int
+    name: str
+
+user = User(user_id="1", "name":"Ramazan")
+type(user.user_id) # <class 'int'>
+# IDE will be able to auto complete 'user_id' and 'name' properties(see example 1 below)
+```
+Why type conversion? Because it will be useful if the incoming data doesn't have the desired type.
+
+```python
+class User(Prodict):
+    user_id: int
+    name: str
+    
+response = requests.get("https://some.restservice.com/user/1").json()
+post: RestResponse = RestResponse.from_dict(response)
+type(post.user_id) # <class 'int'>
+# post.user_id will be an `int`, even if rest service responded with `str`.
+# Same goes for all built-in types(int, str, float)
+```
+
 # Examples
 
 Example 0: Use it like regular `dict`, because **it is** a dict.
@@ -34,7 +126,7 @@ print(set(dir(dict)).issubset(dir(Prodict)))  # True
 
 
 ```
-Example 1: Accessing keys as attributes and type hinting for auto completion.
+Example 1: Accessing keys as attributes and auto completion.
 ```python
 from prodict import Prodict
 class Country(Prodict):
