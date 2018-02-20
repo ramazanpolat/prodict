@@ -5,6 +5,8 @@ import time
 
 from datetime import datetime
 
+import requests
+
 from prodict import Prodict
 
 tc = unittest.TestCase()
@@ -217,7 +219,7 @@ def test_recursive_annotations3():
     r.dynamic_prodict_attr = Prodict.from_dict({'a': 1, 'b': 2, 'c': 3})
 
     assert r.dynamic_dict_attr == {'a': 1, 'b': 2, 'c': 3}
-    assert type(r.dynamic_dict_attr) == dict
+    assert type(r.dynamic_dict_attr) == Prodict
 
     assert r.dynamic_prodict_attr == {'a': 1, 'b': 2, 'c': 3}
     assert type(r.dynamic_prodict_attr) == Prodict
@@ -374,6 +376,28 @@ def test_multiple_instances():
     print(m2)
 
 
+def test_property():
+    class PropertyClass(Prodict):
+        bid: float
+        ask: float
+        last: float
+
+        @property
+        def spread(self) -> float:
+            return self.ask - self.bid
+
+        @property
+        def spread_percent(self) -> float:
+            return 100 * (self.ask - self.bid) / self.last
+
+    btc_usdt = PropertyClass()
+    btc_usdt.bid = 10000
+    btc_usdt.ask = 12000
+    btc_usdt.last = 10000
+    print(btc_usdt.spread)
+    print(btc_usdt.spread_percent)
+
+
 if __name__ == '__main__':
     start_time = datetime.now().timestamp()
 
@@ -398,6 +422,7 @@ if __name__ == '__main__':
     test_null_assignment()
     test_any_type()
     test_multiple_instances()
+    test_property()
 
     end_time = datetime.now().timestamp()
 
