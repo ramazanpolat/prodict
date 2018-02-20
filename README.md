@@ -50,14 +50,14 @@ user = User.from_dict(user_json)
 
 # Features
 
-1) A class with dynamic properties, without defining it beforehand.
+  1) A class with dynamic properties, without defining it beforehand.
 
 ```python
 p = Prodict()
 p.hi = 'there'
 ```
 
-2) Pass named arguments and all arguments will become properties.
+  2) Pass named arguments and all arguments will become properties.
 
 ```python
 p = Prodict(lang='Python', pros='Rocks!')
@@ -66,21 +66,21 @@ print(p.pros)  # Rocks!
 print(p)  # {'lang': 'Python', 'pros': 'Rocks!'}
 ```
 
-3) Instantiate from a `dict`, get `dict` keys as properties
+  3) Instantiate from a `dict`, get `dict` keys as properties
 ```python
 p = Prodict.from_dict({'lang': 'Python', 'pros': 'Rocks!'})
 print(p.lang)   # Python
 p.another_property = 'this is dynamically added'
 ```
 
-4) Pass a `dict` as argument, get a nested `Prodict`!
+  4) Pass a `dict` as argument, get a nested `Prodict`!
 ```python
 p = Prodict(package='Prodict', makes='Python', rock={'even': 'more!'})
 print(p)  #  {'package': 'Prodict', 'makes': 'Python', 'rock': {'even': 'more!'}}
 print(type(p.rock))  # <class 'prodict.Prodict'>
 ```
 
-5) Extend `Prodict` and use type annotations for auto type conversion and auto code completion
+  5) Extend `Prodict` and use type annotations for auto type conversion and auto code completion
 ```python
 class User(Prodict):
     user_id: int
