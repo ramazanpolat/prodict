@@ -1,52 +1,40 @@
 # Prodict
-Prodict = Dictionary with IDE friendly(auto code completion) and dot-accessible attributes and more.
+Prodict = Dictionary with IDE friendly(auto code completion) and dot-accessible attributes **and more**.
 
-# Motivation
-Ever wanted to use a `dict` like a class and access keys as attributes? Prodict does exactly this. 
+# What is does
+Ever wanted to use a `dict` like a class and access keys as attributes? **Prodict** does exactly this. 
 
-Although there are number of modules doing this, Prodict does a little bit more.
+Although there are number of modules doing this, **Prodict** does a little bit **more**.
 
 You can provide type hints and get auto code completion!
 
-With type hints, you also get recursive object instantiations, which will blow your mind.
+With type hints, you also get nested object instantiations, which will blow your mind.
 
 You will never want to use `dict` again.
 
-# Comparison with regular `dict`
+# Why?
+* Because accessing `dict` keys like `d['key']` is error prone and ugly.
 
-Without `Prodict`:
+* Because it becomes uglier if it is nested, like `d['key1]['key2']['key3']`.
+
+Compare this:
+
 ```python
-class Post:
-    def __init(self, text, date):
-        self.text = text
-        self.date = date
-        
-class User:
-    def __init(self, user_id, user_name, posts):
-        self.user_id = user_id
-        self.user_name = user_name
-        self.posts:List[Post] = posts
-       
-user_json = requests.get("https://some.restservice.com/user/1").json()
-
-posts = [Post(post['text'], post['date']) for post in user_json['posts']]
-user = User(user_json['user_id'], user_json['user_name'], posts)
+d['key1]['key2']['key3']
 ```
 
-With `Prodict`:
+to this:
+
 ```python
-class Post(Prodict):
-    text: str
-    date: str
-        
-class User(Prodict):
-    user_id: int
-    user_name: str
-    posts:List[Post]
-       
-user_json = requests.get("https://some.restservice.com/user/1").json()
-user = User.from_dict(user_json)
+d.key1.key2.key3
 ```
+
+* Because since web technologies mostly talk with JSON, it should be much more easy to use JSON data(see sample use case below).
+
+* Because auto code completion makes developers' life easier.
+
+* Because serializing a Python class to `dict` and deserializing from `dict` in one line is awesome!
+ 
 
 # Features
 
@@ -77,6 +65,7 @@ p.another_property = 'this is dynamically added'
 ```python
 p = Prodict(package='Prodict', makes='Python', rock={'even': 'more!'})
 print(p)  #  {'package': 'Prodict', 'makes': 'Python', 'rock': {'even': 'more!'}}
+print(p.rock.even)  #  'more!'
 print(type(p.rock))  # <class 'prodict.Prodict'>
 ```
 
@@ -96,37 +85,166 @@ Why type conversion? Because it will be useful if the incoming data doesn't have
 class User(Prodict):
     user_id: int
     name: str
+    literal: Any
     
 response = requests.get("https://some.restservice.com/user/1").json()
-post: RestResponse = RestResponse.from_dict(response)
-type(post.user_id) # <class 'int'>
-# post.user_id will be an `int`, even if rest service responded with `str`.
-# Same goes for all built-in types(int, str, float)
+user: User = User.from_dict(response)
+type(user.user_id) # <class 'int'>
 ```
+
+**Notes on automatic type conversion**:
+* In the above example code, `user.user_id` will be an `int`, even if rest service responded with `str`.
+* Same goes for all built-in types(int, str, float, bool, list, tuple), except `dict`. Because by default, all `dict` types will be converted to `Prodict`.
+* If you don't want any type conversion but still want to have auto code completion, use `Any` as type annotation, like the `literal` attribute defined in `User` class.
+* If the annotated type of an attribute is sub-class of a `Prodict`, the provided `dict` will be instantiated as the instance of sub-class. Even if it is `List` of the sub-class(see sample usa case below).
+
+
+
+# Sample use case
+
+Suppose that you are getting this JSON response from `https://some.restservice.com/user/1`:
+
+```javascript
+{
+  user_id: 1,
+  user_name: "rambo",
+  posts: [
+    {
+      title:"Hello World",
+      text:"This is my first blog post...",
+      date:"2018-01-02 03:04:05",
+      comments: [
+          {
+            user_id:2,
+            comment:"Good to see you blogging",
+            date:"2018-01-02 03:04:06"
+          },
+          {
+            user_id:3,
+            comment:"Good for you",
+            date:"2018-01-02 03:04:07"
+          }
+        ]
+    },
+    {
+      title:"Leave the old behind",
+      text:"Stop using Python 2.x...",
+      date:"2018-02-03 04:05:06",
+      comments: [
+          {
+            user_id:4,
+            comment:"Python 2 is dead, long live Python",
+            date:"2018-02-03 04:05:07"
+          },
+          {
+            user_id:5,
+            comment:"You are god damn right :wears Heissenberg glasses:",
+            date:"2018-02-03 04:05:08"
+          }
+        ]
+    }
+  ]
+}
+```
+Despite the fact that JSON being schemaless, most REST services will respond with a certain structure.
+In the above example, the structure is something like this:
+```
+User
+ |--> user_id
+ |--> user_name
+ |--> posts [post]
+       |--> title
+       |--> text
+       |--> date
+       |--> comments [comment]
+             |--> user_id
+             |--> comment
+             |--> date
+```
+
+And you want to convert this to appropriate Python classes.
+
+Without `Prodict`:
+
+```python
+class Comment:
+	def __init__(self, user_id, comment, date):
+    	self.user_id = user_id
+    	self.comment = comment
+        self.date = date
+        
+class Post:
+    def __init__(self, title, text, date):
+    	self.title = title
+        self.text = text
+        self.date = date
+        self.comments = []
+        
+class User:
+    def __init__(self, user_id, user_name):
+        self.user_id = user_id
+        self.user_name = user_name
+        self.posts = []
+
+user_json = requests.get("https://some.restservice.com/user/1").json()
+posts = [Post(post['title], post['text'], post['date']) for post in user_json['posts']]
+for post in posts:
+	post.comments = [[comment for comment in post['comments]] for post in user_json['posts']]
+user = User(user_json['user_id'], user_json['user_name'])
+user.posts = posts
+
+```
+
+Becomes this:
+
+```python
+class Comment(Prodict):
+	user_id: int
+    comment: str
+    date: str
+
+class Post(Prodict):
+	title: str
+    text: str
+    date: str
+    comments: List[Comment]
+        
+class User(Prodict):
+    user_id: int
+    user_name: str
+    posts: List[Post]
+
+user_json = requests.get("https://some.restservice.com/user/1").json()
+user:User = User.from_dict(user_json)
+# Don't forget to annotate the `user` with `User` type in order to get auto code completion.
+```
+
+See the difference?
+Plus you can add new attributes to `User`, `Post` and `Comment` objects dynamically and access them as dot-accessible attributes.
+
 
 # Examples
 
-Example 0: Use it like regular `dict`, because **it is** a dict.
+**Example 0**: Use it like regular `dict`, because **it is** a dict.
 ```python
 
 from prodict import Prodict
 
+d = dict(lang='Python', pros='Rocks!')
 p = Prodict(lang='Python', pros='Rocks!')
+
+print(d)  # {'lang': 'Python', 'pros': 'Rocks!'}
 print(p)  # {'lang': 'Python', 'pros': 'Rocks!'}
+print(d == p)  # True
 
 p2 = Prodict.from_dict({'Hello': 'world'})
 
 print(p2)  # {'Hello': 'world'}
-
 print(issubclass(Prodict, dict))  # True
-
 print(isinstance(p, dict))  # True
-
 print(set(dir(dict)).issubset(dir(Prodict)))  # True
-
-
 ```
-Example 1: Accessing keys as attributes and auto completion.
+**Example 1**: Accessing keys as attributes and auto completion.
 ```python
 from prodict import Prodict
 class Country(Prodict):
@@ -140,7 +258,7 @@ turkey.population = 79814871
 
 ![auto code complete](/auto-complete1.png?raw=true "Auto complete in action!")
 
-Example 2: Auto type conversion
+**Example 2**: Auto type conversion
 ```python
 germany = Country(name='Germany', population='82175700', flag_colors=['black', 'red', 'yellow'])
 
@@ -151,7 +269,7 @@ print(germany.flag_colors)  # ['black', 'red', 'yellow']
 print(type(germany.population))  # <class 'int'>
 ```
 
-Example 3: Recursive object instantiation
+**Example 3**: Nested class instantiation
 ```python
 class Ram(Prodict):
     capacity: int
@@ -195,7 +313,9 @@ print(type(comp1.rams[0]))  # <class 'Ram'> <-- Mind the type !
 ```
 
 # Limitations
-- You cannot use names of dict methods as attribute names.
+- You cannot use `dict` method names as attribute names because of ambiguity.
+- You cannot use `Prodict` method names as attribute names(I will change `Prodict` method names with dunder names to reduce the limitation).
+- You must use valid variable names as `Prodict` attribute names(obviously). For example, while '1' cannot be an attribute for `Prodict`, it is perfectly valid for a `dict` to have '1' as a key. You can still use prodict.set_attribute('1',123) tho.
 - Requires Python 3.6+
 
 # Thanks
