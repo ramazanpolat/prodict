@@ -299,6 +299,15 @@ print(comp1.rams)
 print(type(comp1.rams))  # <class 'list'>
 print(type(comp1.rams[0]))  # <class 'Ram'> <-- Mind the type !
 ```
+# Installation
+If your default Python is 3.6:
+
+`pip install prodict`
+
+If you have more than one Python versions installed:
+
+`Python3.6 -m pip install prodict`
+
 
 # Limitations
 - You cannot use `dict` method names as attribute names because of ambiguity.
