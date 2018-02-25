@@ -183,16 +183,16 @@ user.posts = posts
 
 ```
 
-Becomes this:
+With **Prodict** becomes this:
 
 ```python
 class Comment(Prodict):
-	user_id: int
+    user_id: int
     comment: str
     date: str
 
 class Post(Prodict):
-	title: str
+    title: str
     text: str
     date: str
     comments: List[Comment]
