@@ -15,19 +15,7 @@ You will never want to use `dict` again.
 # Why?
 * Because accessing `dict` keys like `d['key']` is error prone and ugly.
 
-* Because it becomes uglier if it is nested, like `d['key1]['key2']['key3']`.
-
-Compare this:
-
-```python
-d['key1]['key2']['key3']
-```
-
-to this:
-
-```python
-d.key1.key2.key3
-```
+* Because it becomes uglier if it is nested, like `d['key1]['key2']['key3']`. Compare `d['key1]['key2']['key3']` to `d.key1.key2.key3`, which one looks better?
 
 * Because since web technologies mostly talk with JSON, it should be much more easy to use JSON data(see sample use case below).
 
