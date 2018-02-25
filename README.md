@@ -306,7 +306,7 @@ If your default Python is 3.6:
 
 If you have more than one Python versions installed:
 
-`Python3.6 -m pip install prodict`
+`python3.6 -m pip install prodict`
 
 
 # Limitations
