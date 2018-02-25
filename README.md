@@ -275,8 +275,7 @@ class Computer(Prodict):
 
 comp1 = Computer.from_dict(
     {
-        'name':
-            'My Computer',
+        'name': 'My Computer',
         'cpu_cores': 4,
         'rams': [
             {'capacity': 4,
@@ -285,7 +284,7 @@ comp1 = Computer.from_dict(
              'clock': 2400}
         ]
     })
-print(comp1.rams)  # [{'capacity': 4, 'type': 'DDR3'}]
+print(comp1.rams)  #  [{'capacity': 4, 'unit': 'GB', 'type': 'DDR3', 'clock': 2400}]
 
 comp1.rams.append(Ram(capacity=8, type='DDR3'))
 comp1.rams.append(Ram.from_dict({'capacity': 12, 'type': 'DDR3', 'clock': 2400}))
