@@ -1,7 +1,7 @@
 # Prodict
 Prodict = Dictionary with IDE friendly(auto code completion) and dot-accessible attributes **and more**.
 
-# What is does
+# What it does
 Ever wanted to use a `dict` like a class and access keys as attributes? **Prodict** does exactly this. 
 
 Although there are number of modules doing this, **Prodict** does a little bit **more**.
