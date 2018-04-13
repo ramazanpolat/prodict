@@ -232,6 +232,19 @@ print(issubclass(Prodict, dict))  # True
 print(isinstance(p, dict))  # True
 print(set(dir(dict)).issubset(dir(Prodict)))  # True
 ```
+One difference between a `Prodict` and `dict` is, since you can set any attribute dynamically, you can also ask for any attribute and Prodict returns `None` if no value is set for that attribute name, while `dict` raises KeyError in that case.
+
+For example:
+```
+a = dict(my_key=1)
+print(a['my_key']) # 1
+print(a['undefined_key']) # KeyError: 'undefined_key'
+
+p = Prodict(my_key=1)
+print(p.my_key) # 1
+print(p.undefined_key]) # None
+```
+
 **Example 1**: Accessing keys as attributes and auto completion.
 ```python
 from prodict import Prodict
@@ -298,6 +311,38 @@ print(comp1.rams)
 print(type(comp1.rams))  # <class 'list'>
 print(type(comp1.rams[0]))  # <class 'Ram'> <-- Mind the type !
 ```
+# Class attributes vs Instance attributes
+
+Prodict only works for instance attributes.
+Even if you try to set an inherited class attribute, a new instance attribute is created and set.
+
+Consider this example:
+```
+from prodict import Prodict
+
+class MyClass(Prodict):
+    class_attr: int = 42  # class_attr is a class attribute, not instance attribute
+
+my_class = MyClass()
+print(f"my_class.class_attr: {my_class.class_attr}")  # 42
+# There is no 'static_attr' defined as instance attribute, so class attribute will be returned (42).
+print(f"MyClass.class_attr: {MyClass.class_attr}") # 42
+# This is a class attribute, it will be returned as is.
+
+# Now an instance attribute 'class_attr' is created and set to 77
+my_class.class_attr = 77
+print(f"my_class.class_attr: {my_class.class_attr}")  # 42
+# For this matter, avoid setting class_attribute with dot notation, use class name instead
+
+MyClass.class_attr = 88
+print(f"MyClass.class_attr: {my_class.class_attr}")  # 88
+
+# So where did 77 go? It is in instance attribute of the class and since it's name is colliding with
+# the class attribute, you can't get it by dot notation. You can use .get tho.
+print(f"my_class.get('class_attr'): {my_class.get('class_attr')}")  # 77
+```
+
+
 # Installation
 If your default Python is 3.6:
 
