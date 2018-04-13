@@ -235,7 +235,7 @@ print(set(dir(dict)).issubset(dir(Prodict)))  # True
 One difference between a `Prodict` and `dict` is, since you can set any attribute dynamically, you can also ask for any attribute and Prodict returns `None` if no value is set for that attribute name, while `dict` raises KeyError in that case.
 
 For example:
-```
+```python
 a = dict(my_key=1)
 print(a['my_key']) # 1
 print(a['undefined_key']) # KeyError: 'undefined_key'
@@ -317,7 +317,7 @@ Prodict only works for instance attributes.
 Even if you try to set an inherited class attribute, a new instance attribute is created and set.
 
 Consider this example:
-```
+```python
 from prodict import Prodict
 
 class MyClass(Prodict):
