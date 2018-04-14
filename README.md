@@ -325,7 +325,7 @@ class MyClass(Prodict):
 
 my_class = MyClass()
 print(f"my_class.class_attr: {my_class.class_attr}")  # 42
-# There is no 'static_attr' defined as instance attribute, so class attribute will be returned (42).
+# There is no 'class_attr' defined as instance attribute, so class attribute will be returned (42).
 print(f"MyClass.class_attr: {MyClass.class_attr}") # 42
 # This is a class attribute, it will be returned as is.
 
