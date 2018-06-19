@@ -63,7 +63,7 @@ class User(Prodict):
     user_id: int
     name: str
 
-user = User(user_id="1", "name":"Ramazan")
+user = User(user_id="1", name="Ramazan")
 type(user.user_id) # <class 'int'>
 # IDE will be able to auto complete 'user_id' and 'name' properties(see example 1 below)
 ```
