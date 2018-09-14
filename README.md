@@ -175,9 +175,10 @@ class User:
         self.posts = []
 
 user_json = requests.get("https://some.restservice.com/user/1").json()
-posts = [Post(post['title], post['text'], post['date']) for post in user_json['posts']]
+posts = [Post(post['title'], post['text'], post['date']) for post in user_json['posts']]
 for post in posts:
-	post.comments = [[comment for comment in post['comments]] for post in user_json['posts']]
+    post.comments = [[comment for comment in post['comments']] for post in user_json['posts']]
+
 user = User(user_json['user_id'], user_json['user_name'])
 user.posts = posts
 
