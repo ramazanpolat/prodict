@@ -1,6 +1,13 @@
 # Prodict
 Prodict = Dictionary with IDE friendly(auto code completion) and dot-accessible attributes **and more**.
 
+## UPDATE
+*Before writing this package, I wanted to create an elegant library that satisfies my needs. And that's how ``Prodict`` born.
+After releasing ``Prodict`` I happen to find another library that is far better than ``Prodict``. It is called [Pydantic](https://pydantic-docs.helpmanual.io/). Upon checking the library, I've came to a conclusion that investing time in Prodict will be wasting my time. Because ``Pydantic`` is a fantastic library that already does everything ``Prodict`` can do, and much more.*
+
+*Although both packages share same idea and philosophy, I strongly encourage you to use [Pydantic](https://pydantic-docs.helpmanual.io/) instead of ``Prodict`` since it is more mature and advanced library.*
+
+
 # What it does
 Ever wanted to use a `dict` like a class and access keys as attributes? **Prodict** does exactly this. 
 
