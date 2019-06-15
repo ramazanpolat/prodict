@@ -1,6 +1,12 @@
-from typing import Any, List
+from typing import Any, List, TypeVar, Tuple
+
+# from typing_inspect import get_parameters
 
 DICT_RESERVED_KEYS = vars(dict).keys()
+
+
+class GenericMeta(type):
+    pass
 
 
 class Prodict(dict):
@@ -76,27 +82,36 @@ class Prodict(dict):
         element_type = None
         attr_type1 = self.attr_type(attr_name)
         # print('     attr_name="{}" attr_type={} value={}'.format(attr_name, attr_type1, value))
+        # print("attr_type1:", attr_type1)
+        # print("type(attr_type1):", type(attr_type1))
+        # print(dir(attr_type1))
         if attr_type1 == list:
             constructor = list
         elif isinstance(value, Prodict):
             constructor = attr_type1.from_dict
-        elif attr_type1 == List:
-            constructor = list
-        elif issubclass(attr_type1, List):
-            if len(attr_type1.__args__) == 0:
-                constructor = list
-            elif len(attr_type1.__args__) == 1:
-                constructor = List
-                element_type = attr_type1.__args__[0]
-            if len(attr_type1.__args__) > 1:
-                raise TypeError('Only one dimensional List is supported, like List[str], List[int], List[Prodict]')
+        elif attr_type1 is Any:
+            constructor = None
         elif isinstance(value, dict):
             if attr_type1 == dict:
                 constructor = Prodict.from_dict
             elif issubclass(attr_type1, Prodict):
                 constructor = self.attr_type(attr_name).from_dict
-        elif attr_type1 in [int, str, float]:
-            constructor = attr_type1
+        elif attr_type1 is List:
+            # if the type is 'List'
+            constructor = list
+        elif hasattr(attr_type1, '__origin__'):
+            if attr_type1.__dict__['__origin__'] is list:
+                # if the type is 'List[something]'
+                if len(attr_type1.__args__) == 0:
+                    constructor = list
+                elif len(attr_type1.__args__) == 1:
+                    constructor = List
+                    element_type = attr_type1.__args__[0]
+                elif len(attr_type1.__args__) > 1:
+                    raise TypeError('Only one dimensional List is supported, like List[str], List[int], List[Prodict]')
+            elif attr_type1.__dict__['__origin__'] is tuple:
+                # if the type is 'Tuple[something]'
+                constructor = tuple
 
         # print('     constructor={} element_type={}'.format(constructor, element_type))
         return constructor, element_type

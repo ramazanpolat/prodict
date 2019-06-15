@@ -1,12 +1,6 @@
 from typing import List, Optional, Any, Tuple
 import unittest
-
-import time
-
 from datetime import datetime
-
-import requests
-
 from prodict import Prodict
 
 tc = unittest.TestCase()
@@ -167,12 +161,16 @@ def test_setting_and_getting_advanced_attrs():
 
 
 def test_list_annotation():
+    print("== test_list_annotation ==")
     pd = ListProdict()
     assert pd == {}
     assert set(pd.attr_names()) == {'li', 'li_int', 'li_str'}
 
+    print("test List")
     pd.li = [1, 2, 3]
+    print("test List[int]")
     pd.li_int = [1, 2, 3]
+    print("test List[str]")
     pd.li_str = ['a', 'b', 'c']
 
     assert pd.li == [1, 2, 3]
