@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "prodict"
+version = "0.1.0"
+description = "Dictionary with IDE friendly attributes"
+authors = ["Ramazan <ramazanpolat@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
