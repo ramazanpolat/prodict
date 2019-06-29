@@ -22,10 +22,6 @@ You will never want to use `dict` again.
 * Because auto code completion makes developers' life easier.
 
 * Because serializing a Python class to `dict` and deserializing from `dict` in one line is awesome!
-
-# TODO
-
-* Add default values with the help of https://stackoverflow.com/questions/9058305/getting-attributes-of-a-class
  
 
 # Features
