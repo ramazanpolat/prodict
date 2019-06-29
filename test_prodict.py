@@ -396,6 +396,21 @@ def test_property():
     print(btc_usdt.spread_percent)
 
 
+def test_use_defaults_method():
+
+    class WithDefault(Prodict):
+        a: int
+        b: str
+
+        def defaults(self):
+            self.a = 1
+            self.b = 'string'
+
+    wd = WithDefault()
+    assert wd.a == 1
+    assert wd.b == 'string'
+
+
 if __name__ == '__main__':
     start_time = datetime.now().timestamp()
 
@@ -421,6 +436,7 @@ if __name__ == '__main__':
     test_any_type()
     test_multiple_instances()
     test_property()
+    test_use_defaults_method()
 
     end_time = datetime.now().timestamp()
 

@@ -325,6 +325,29 @@ print(comp1.rams)
 print(type(comp1.rams))  # <class 'list'>
 print(type(comp1.rams[0]))  # <class 'Ram'> <-- Mind the type !
 ```
+
+**Example 4**: Provide default values
+
+You can use `init` method to provide default values. Keep in mind that `init` is NOT `__init__` but `init` method will be called in `__init__` method.
+
+Additionally, you can use `init` method instead of `__init__` without referring to `super`.
+
+```python
+class MyDataWithDefaults(Prodict):
+    an_int: int
+    a_str: str
+    
+    def init(self):
+        self.an_int = 42
+        self.a_str = 'string'
+        
+
+data = MyDataWithDefaults(dynamic=43)
+print(data)
+# {'an_int':43, 'a_str':'string', 'dynamic':43}
+
+``` 
+
 # Class attributes vs Instance attributes
 
 Prodict only works for instance attributes.

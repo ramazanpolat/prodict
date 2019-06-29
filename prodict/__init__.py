@@ -20,7 +20,11 @@ class Prodict(dict):
         # for k, v in self.attr_types().items():
         #     if self.attr_has_default_value(k):
         #         self.set_default(k)
+        self.init()
         self.set_attributes(**kwargs)
+
+    def init(self):
+        ...
 
     @classmethod
     def from_dict(cls, d: dict):
