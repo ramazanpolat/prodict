@@ -16,6 +16,9 @@ class SimpleKeyDefaultValue(Prodict):
     int_key: int = 1
     str_key: str = 'default str'
     float_key: float = 1.234
+    anno_str: str
+    anno_int: int
+    anno_dict: dict
 
 
 class AdvancedKeyValue(Prodict):
@@ -43,6 +46,8 @@ def test_has_attr():
 
 
 def test_dict_reserved_keys():
+    # p = Prodict(pop=6)
+    # print(p.pop)
     with tc.assertRaises(TypeError):
         Prodict(pop=5)
 
@@ -79,31 +84,30 @@ def test_setting_unannotated_keys():
     assert pd.dynamic_float == 0.123
 
 
-# def test_default_values():
-#     if 1 == 1:
-#         raise NotImplemented
-#     pd = SimpleKeyDefaultValue()
-#     assert pd.has_attr('int_key')
-#     assert pd.has_attr('str_key')
-#     assert pd.has_attr('float_key')
-#     assert pd.int_key == 1
-#     assert pd.str_key == 'default str'
-#     assert pd.float_key == 1.234
-#     pd.int_key = 2
-#     print('pd.int_key = ', pd.int_key)
-#     pd.str_key = 'new'
-#     pd.float_key = 2.345
-#
-#     assert pd.int_key == 2
-#     assert pd.str_key == 'new'
-#     assert pd.float_key == 2.345
+def test_default_values():
+    pd = SimpleKeyDefaultValue()
+    assert pd.has_attr('int_key')
+    assert pd.has_attr('str_key')
+    assert pd.has_attr('float_key')
+    assert pd.int_key == 1
+    assert pd.str_key == 'default str'
+    assert pd.float_key == 1.234
+    print(SimpleKeyDefaultValue.int_key)
+    pd.int_key = 2
+    print('pd.int_key = ', pd.int_key)
+    pd.str_key = 'new'
+    pd.float_key = 2.345
+
+    assert pd.int_key == 2
+    assert pd.str_key == 'new'
+    assert pd.float_key == 2.345
 
 
 def test_annotated_constructor():
     pd = SimpleKeyValue(int_key=0, str_key='str', float_key=1.234)
     print(pd)
     assert pd == {'int_key': 0, 'str_key': 'str', 'float_key': 1.234}
-    assert set(pd.attr_names()) == {'int_key', 'str_key', 'float_key'}
+    assert set(pd.anno_names()) == {'int_key', 'str_key', 'float_key'}
 
 
 def test_dynamic_constructor():
@@ -112,7 +116,7 @@ def test_dynamic_constructor():
     print(pd)
     assert pd == {'int_key': 0, 'str_key': 'str', 'float_key': 1.234, 'dyn_int_key': 1, 'dyn_str_key': 'dyn_str',
                   'dyn_float_key': 2.345}
-    assert set(pd.attr_names()) == {'int_key', 'str_key', 'float_key'}
+    assert set(pd.anno_names()) == {'int_key', 'str_key', 'float_key'}
 
 
 def test_load_annotated_attrs_from_dict():
@@ -133,19 +137,19 @@ def test_load_dynamic_attrs_from_dict():
 
 def test_annotated_attr_names():
     pd = SimpleKeyValue()
-    assert set(pd.attr_names()) == {'int_key', 'str_key', 'float_key'}
+    assert set(pd.anno_names()) == {'int_key', 'str_key', 'float_key'}
 
 
 def test_advanced_attr_names():
     pd = AdvancedKeyValue()
     assert pd == {}
-    assert set(pd.attr_names()) == {'tuple_key', 'list_key', 'dict_key'}
+    assert set(pd.anno_names()) == {'tuple_key', 'list_key', 'dict_key'}
 
 
 def test_setting_and_getting_advanced_attrs():
     pd = AdvancedKeyValue()
     assert pd == {}
-    assert set(pd.attr_names()) == {'tuple_key', 'list_key', 'dict_key'}
+    assert set(pd.anno_names()) == {'tuple_key', 'list_key', 'dict_key'}
 
     pd.tuple_key = (1, 2)
     pd.list_key = [1, 2, 3]
@@ -164,7 +168,7 @@ def test_list_annotation():
     print("== test_list_annotation ==")
     pd = ListProdict()
     assert pd == {}
-    assert set(pd.attr_names()) == {'li', 'li_int', 'li_str'}
+    assert set(pd.anno_names()) == {'li', 'li_int', 'li_str'}
 
     print("test List")
     pd.li = [1, 2, 3]
@@ -181,7 +185,7 @@ def test_list_annotation():
 def test_recursive_annotations1():
     r = Recursive()
     assert r == {}
-    assert set(r.attr_names()) == {'prodict_key', 'simple_key'}
+    assert set(r.anno_names()) == {'prodict_key', 'simple_key'}
 
     r.prodict_key = Prodict(a=1)
     print('r.prodict_key =', r.prodict_key)
@@ -195,7 +199,7 @@ def test_recursive_annotations1():
 def test_recursive_annotations2():
     r = Recursive()
 
-    assert set(r.attr_names()) == {'prodict_key', 'simple_key'}
+    assert set(r.anno_names()) == {'prodict_key', 'simple_key'}
 
     r.simple_key = SimpleKeyValue(int_key=0, str_key='str', float_key=1.234, dyna_key='dynamic_value')
     print('r.simple_key =', r.simple_key)
@@ -206,7 +210,7 @@ def test_recursive_annotations2():
     print('type(r.simple_key) =', type(r.simple_key))
 
     assert r.simple_key == {'int_key': 0, 'str_key': 'str', 'float_key': 1.234, 'dyna_key': 'dynamic_value'}
-    assert set(r.simple_key.attr_names()) == {'int_key', 'str_key', 'float_key'}
+    assert set(r.simple_key.anno_names()) == {'int_key', 'str_key', 'float_key'}
     assert type(r.simple_key) == SimpleKeyValue
 
 
@@ -396,32 +400,61 @@ def test_property():
     print(btc_usdt.spread_percent)
 
 
+def test_dict_attr():
+    class DictProdict(Prodict):
+        d: dict
+        p: Prodict
+
+    dp = DictProdict.from_dict({'d': {'a': 1}, 'p': {'x': 1}})
+    dp.d = {'x': 1}
+    print(dp)
+    print(dp.d)
+    print('type(dp.d):', type(dp.d))
+    print(dp.p)
+    print('type(dp.p):', type(dp.p))
+
+
+def test_set_default_values():
+    class Default(Prodict):
+        s: str = 'xyz'
+        n: int = 0
+        x: int
+        y: str
+        z = 5
+
+    d = Default.from_dict({'s': 'xyz1', 'n': 1, 'x': 2, 'z': 7})
+    d.z = 6
+    print(d)
+
+
 if __name__ == '__main__':
     start_time = datetime.now().timestamp()
 
-    test_has_attr()
-    test_attr_initial_value_is_none()
-    test_setting_and_getting_attrs()
-    test_setting_unannotated_keys()
-    test_load_annotated_attrs_from_dict()
-    test_load_dynamic_attrs_from_dict()
-    test_annotated_attr_names()
-    test_advanced_attr_names()
-    test_setting_and_getting_advanced_attrs()
-    test_list_annotation()
-    test_dynamic_constructor()
-    test_annotated_constructor()
-    test_recursive_annotations1()
-    test_recursive_annotations2()
-    test_recursive_annotations3()
-    test_dict_reserved_keys()
-    test_deep_recursion_from_dict()
-    test_bracket_access()
-    test_null_assignment()
-    test_any_type()
-    test_multiple_instances()
-    test_property()
-
+    # test_has_attr()
+    # test_attr_initial_value_is_none()
+    # test_setting_and_getting_attrs()
+    # test_setting_unannotated_keys()
+    # test_load_annotated_attrs_from_dict()
+    # test_load_dynamic_attrs_from_dict()
+    # test_annotated_attr_names()
+    # test_advanced_attr_names()
+    # test_setting_and_getting_advanced_attrs()
+    # test_list_annotation()
+    # test_dynamic_constructor()
+    # test_annotated_constructor()
+    # test_recursive_annotations1()
+    # test_recursive_annotations2()
+    # test_recursive_annotations3()
+    # test_dict_reserved_keys()
+    # test_deep_recursion_from_dict()
+    # test_bracket_access()
+    # test_null_assignment()
+    # test_any_type()
+    # test_multiple_instances()
+    # test_property()
+    # test_dict_attr()
+    # test_set_default_values()
+    test_default_values()
     end_time = datetime.now().timestamp()
 
     print('Whole test suite took {} seconds.'.format(end_time - start_time))
