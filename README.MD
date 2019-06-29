@@ -325,6 +325,29 @@ print(comp1.rams)
 print(type(comp1.rams))  # <class 'list'>
 print(type(comp1.rams[0]))  # <class 'Ram'> <-- Mind the type !
 ```
+
+**Example 4**: Provide default values
+
+You can use `init` method to provide default values. Keep in mind that `init` is NOT `__init__` but `init` method will be called in `__init__` method.
+
+Additionally, you can use `init` method instead of `__init__` without referring to `super`.
+
+```python
+class MyDataWithDefaults(Prodict):
+    an_int: int
+    a_str: str
+    
+    def init(self):
+        self.an_int = 42
+        self.a_str = 'string'
+        
+
+data = MyDataWithDefaults(dynamic=43)
+print(data)
+# {'an_int':43, 'a_str':'string', 'dynamic':43}
+
+``` 
+
 # Class attributes vs Instance attributes
 
 Prodict only works for instance attributes.
@@ -358,20 +381,20 @@ print(f"my_class.get('class_attr'): {my_class.get('class_attr')}")  # 77
 
 
 # Installation
-If your default Python is 3.7:
+If your default Python is 3.6:
 
 `pip install prodict`
 
 If you have more than one Python versions installed:
 
-`python3.7 -m pip install prodict`
+`python3.6 -m pip install prodict`
 
 
 # Limitations
 - You cannot use `dict` method names as attribute names because of ambiguity.
 - You cannot use `Prodict` method names as attribute names(I will change `Prodict` method names with dunder names to reduce the limitation).
-- You must use valid variable names as `Prodict` attribute names(obviously). For example, while '1' cannot be an attribute for `Prodict`, it is perfectly valid for a `dict` to have '1' as a key. You can still use prodict.set_attribute('1',123) and prodict.get_attribute(1) tho.
-- Requires Python 3.7+
+- You must use valid variable names as `Prodict` attribute names(obviously). For example, while '1' cannot be an attribute for `Prodict`, it is perfectly valid for a `dict` to have '1' as a key. You can still use prodict.set_attribute('1',123) tho.
+- Requires Python 3.6+
 
 # Thanks
 I would like to thank to [JetBrains](https://www.jetbrains.com/) for creating [PyCharm](https://www.jetbrains.com/pycharm/), the IDE that made my life better.
