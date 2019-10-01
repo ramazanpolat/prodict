@@ -402,7 +402,7 @@ def test_use_defaults_method():
         a: int
         b: str
 
-        def defaults(self):
+        def init(self):
             self.a = 1
             self.b = 'string'
 
