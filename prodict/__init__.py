@@ -82,14 +82,20 @@ class Prodict(dict):
             self.update({attr_name: attr_default_value})
 
     def get_constructor(self, attr_name, value):
+        attr_type1 = self.attr_type(attr_name)
         constructor = None
         element_type = None
-        attr_type1 = self.attr_type(attr_name)
         # print('     attr_name="{}" attr_type={} value={}'.format(attr_name, attr_type1, value))
         # print("attr_type1:", attr_type1)
         # print("type(attr_type1):", type(attr_type1))
         # print(dir(attr_type1))
-        if attr_type1 == list:
+        if attr_type1 == float:
+            constructor = float
+        elif attr_type1 == str:
+            constructor = str
+        elif attr_type1 == int:
+            constructor = int
+        elif attr_type1 == list:
             constructor = list
         elif isinstance(value, Prodict):
             constructor = attr_type1.from_dict

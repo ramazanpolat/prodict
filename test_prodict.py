@@ -397,12 +397,11 @@ def test_property():
 
 
 def test_use_defaults_method():
-
     class WithDefault(Prodict):
         a: int
         b: str
 
-        def defaults(self):
+        def init(self):
             self.a = 1
             self.b = 'string'
 
@@ -411,9 +410,23 @@ def test_use_defaults_method():
     assert wd.b == 'string'
 
 
+def test_type_conversion():
+    class TypeConversionClass(Prodict):
+        an_int: int
+        a_str: str
+        a_float: float
+
+    assert TypeConversionClass(an_int='1').an_int == 1
+    assert TypeConversionClass(an_int=1).an_int == 1
+    assert TypeConversionClass(a_str='str').a_str == 'str'
+    assert TypeConversionClass(a_float=123.45).a_float == 123.45
+    assert TypeConversionClass(a_float='123.45').a_float == 123.45
+
+
 if __name__ == '__main__':
     start_time = datetime.now().timestamp()
 
+    test_type_conversion()
     test_has_attr()
     test_attr_initial_value_is_none()
     test_setting_and_getting_attrs()

@@ -3,7 +3,7 @@ from distutils.core import setup
 setup(
     name='prodict',
     packages=['prodict'],  # this must be the same as the name above
-    version='0.8.2',
+    version='0.8.3',
     description='Prodict = Pro Dictionary with IDE friendly(auto code completion), dot-accessible attributes and more.',
     long_description='Ever wanted to use a dict like a class and access keys as attributes? '
                      'Prodict does exactly this.'
