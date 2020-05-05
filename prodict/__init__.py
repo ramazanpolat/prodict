@@ -1,4 +1,5 @@
 from typing import Any, List, TypeVar, Tuple
+import copy
 
 # from typing_inspect import get_parameters
 
@@ -20,11 +21,19 @@ class Prodict(dict):
         # for k, v in self.attr_types().items():
         #     if self.attr_has_default_value(k):
         #         self.set_default(k)
-        self.init()
         self.set_attributes(**kwargs)
+        self.init()
 
     def init(self):
         ...
+
+    def __deepcopy__(self, memo=None):
+        print("__deepcopy__ type(self):", type(self))
+        new = self.from_dict({})
+        for key in self.keys():
+            new.set_attribute(key, copy.deepcopy(self[key], memo=memo))
+        return new
+        # return copy.deepcopy(self.from_dict(self.to_dict()), memo=memo)
 
     @classmethod
     def from_dict(cls, d: dict):

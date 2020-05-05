@@ -2,6 +2,7 @@ from typing import List, Optional, Any, Tuple
 import unittest
 from datetime import datetime
 from prodict import Prodict
+import copy
 
 tc = unittest.TestCase()
 
@@ -423,6 +424,62 @@ def test_type_conversion():
     assert TypeConversionClass(a_float='123.45').a_float == 123.45
 
 
+def test_deepcopy1():
+    root_node = Prodict(number=1, data="ROOT node", next=None)
+
+    copied = copy.deepcopy(root_node)
+
+    print("--root-node id:", id(root_node))
+    print(root_node)
+    print("--copied id:", id(copied))
+    print(copied)
+    print("--root_node.data")
+    print(type(root_node))
+    print(root_node.data)
+    print("--copied.data")
+    print(type(copied))
+    print(copied.data)
+
+    # have same dict
+    assert copied == root_node
+    # have different id
+    assert copied is not root_node
+    # have same type
+    assert type(root_node) is type(copied)
+
+
+def test_deepcopy2():
+    class MyLinkListNode(Prodict):
+        number: int
+        data: Any
+        next: Prodict
+
+    root_node = MyLinkListNode(number=1, data="ROOT node", next=None)
+    # node1 = MyLinkListNode(number=2, data="1st node", next=None)
+    # root_node.next = node1
+
+    copied = copy.deepcopy(root_node)
+    # copied.number += 1
+
+    print("--root-node id:", id(root_node))
+    print(root_node)
+    print("--copied id:", id(copied))
+    print(copied)
+    print("--root_node.data")
+    print(type(root_node))
+    print(root_node.data)
+    print("--copied.data")
+    print(type(copied))
+    print(copied.data)
+
+    # have same dict
+    assert copied == root_node
+    # have different id
+    assert copied is not root_node
+    # have same type
+    assert type(root_node) is type(copied)
+
+
 if __name__ == '__main__':
     start_time = datetime.now().timestamp()
 
@@ -450,6 +507,8 @@ if __name__ == '__main__':
     test_multiple_instances()
     test_property()
     test_use_defaults_method()
+    test_deepcopy1()
+    test_deepcopy2()
 
     end_time = datetime.now().timestamp()
 
