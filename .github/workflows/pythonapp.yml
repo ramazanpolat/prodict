@@ -37,7 +37,7 @@ jobs:
     - name: Twine test upload to testpypi
       run: |
         sed -i 's/# TESTPYPI_TOKEN/${{ secrets.TESTPYPI_TOKEN }}/' .pypirc
-        echo .pypirc
+        cat .pypirc
         cp .pypirc $HOME/
         twine upload --repository testpypi dist/*
       
