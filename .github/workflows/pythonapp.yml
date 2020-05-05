@@ -29,11 +29,17 @@ jobs:
       run: |
         pip install pytest
         pytest
-    - name: Check with twine
+    - name: Twine check
       run: |
         pip install twine
         python setup.py sdist
         twine check dist/*
+    - name: Twine test upload to testpypi
+      run: |
+        sed -i 's/# TESTPYPI_TOKEN/{{secrets.TESTPYPI_TOKEN}}/' .pypirc
+        echo .pypirc
+        cp .pypirc $HOME/
+        twine upload --repository testpypi dist/*
       
       
       
