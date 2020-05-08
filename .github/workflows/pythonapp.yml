@@ -42,7 +42,7 @@ jobs:
         cp .pypirc $HOME/
         twine upload --repository testpypi dist/*
 
-    - name: Twine test upload to testpypi
+    - name: Twine upload to pypi
       run: |
         twine upload dist/*
       
