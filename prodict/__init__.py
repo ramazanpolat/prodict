@@ -206,7 +206,7 @@ class Prodict(dict):
 
     def __getattr__(self, item):
         # print('__getattr__("{}")'.format(item))
-        return self.get(item, None)
+        return self[item]
 
     # def __getattribute__(self, item):
     #     print('__getattribute__("{}")'.format(item))

@@ -271,7 +271,7 @@ class Computer(Prodict):
         return sum([ram.capacity for ram in self.rams])
 
     def total_ram2(self):
-        if self.rams2:
+        if 'rams2' in self:
             return sum([ram.capacity for ram in self.rams2])
         return 0
 
@@ -480,12 +480,32 @@ def test_deepcopy2():
     assert type(root_node) is type(copied)
 
 
+def test_unknown_attr():
+    ram = Ram.from_dict({'brand': 'Samsung', 'capacity': 4, 'unit': 'YB'})
+    print(ram.brand)        # Ok
+
+    # Should fail
+    try:
+        print(ram['flavor'])
+        assert(False)
+    except KeyError:
+        pass
+
+    # Should fail
+    try:
+        print(ram.flavor)
+        assert(False)
+    except KeyError:
+        pass
+
+
+
 if __name__ == '__main__':
     start_time = datetime.now().timestamp()
 
     test_type_conversion()
     test_has_attr()
-    test_attr_initial_value_is_none()
+    # test_attr_initial_value_is_none()     # Behavior change makes this test irrelevant
     test_setting_and_getting_attrs()
     test_setting_unannotated_keys()
     test_load_annotated_attrs_from_dict()
@@ -509,6 +529,7 @@ if __name__ == '__main__':
     test_use_defaults_method()
     test_deepcopy1()
     test_deepcopy2()
+    test_unknown_attr()
 
     end_time = datetime.now().timestamp()
 
