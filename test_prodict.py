@@ -1,4 +1,4 @@
-from typing import List, Optional, Any, Tuple
+from typing import List, Optional, Any, Tuple, Union
 import unittest
 from datetime import datetime
 from prodict import Prodict
@@ -480,6 +480,37 @@ def test_deepcopy2():
     assert type(root_node) is type(copied)
 
 
+class SupportedOptional(Prodict):
+    f1: int
+    f2: Optional[str]
+
+class UnsupportedUnion1(Prodict):
+    f1: Union[str, int]         # Illegal
+
+class UnsupportedUnion2(Prodict):
+    f1: Union[str, int, Ram]    # Also illegal
+
+
+def test_optional():
+    # Should work
+    obj = SupportedOptional.from_dict({'f1': 33, 'f2': "field2"})     # Fails with original code, works with updated
+
+    # Should fail
+    try:
+        obj = UnsupportedUnion1.from_dict({'f1': 4})
+        assert(False)
+    except TypeError:
+        pass
+    
+    # Should fail
+    try:
+        obj = UnsupportedUnion2.from_dict({'f1': 4})
+        assert(False)
+    except TypeError:
+        pass
+
+
+
 if __name__ == '__main__':
     start_time = datetime.now().timestamp()
 
@@ -509,6 +540,7 @@ if __name__ == '__main__':
     test_use_defaults_method()
     test_deepcopy1()
     test_deepcopy2()
+    test_optional()
 
     end_time = datetime.now().timestamp()
 
