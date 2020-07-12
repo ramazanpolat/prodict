@@ -1,4 +1,4 @@
-from typing import Any, List, TypeVar, Tuple
+from typing import Any, List, TypeVar, Tuple, Union
 import copy
 
 # from typing_inspect import get_parameters
@@ -55,7 +55,21 @@ class Prodict(dict):
 
     @classmethod
     def attr_type(cls, attr_name: str):
-        return cls.attr_types()[attr_name]
+        t = cls.attr_types()[attr_name]
+        if hasattr(t, "__origin__") and t.__origin__ is Union:
+            args = t.__args__
+            if len(args) != 2:
+                raise TypeError("Unsupported Union -- only 2 elements (i.e. Optional[]) allowed")
+
+            # Index 1 is where we'll usually find the None, so check there first
+            if args[1] is type(None):
+                return args[0] 
+            elif args[0] is type(None):     
+                return args[1]
+            else:
+                raise TypeError("Unsupported Union -- only Unions with None (i.e. Optional[]) allowed")
+        else:
+            return cls.attr_types()[attr_name]
 
     @classmethod
     def attr_types(cls):
