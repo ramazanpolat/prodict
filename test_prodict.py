@@ -52,7 +52,8 @@ def test_dict_reserved_keys():
         pd2.pop = 5
 
 
-def test_attr_initial_value_is_none():
+def dont_test_attr_initial_value_is_none():
+    # we don't need to test this anymore since undefined keys produce KeyError since #9
     pd = SimpleKeyValue()
     assert pd.int_key is None
     assert pd.str_key is None
