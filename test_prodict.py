@@ -38,7 +38,7 @@ class Recursive(Prodict):
 
 def test_has_attr():
     pd = SimpleKeyValue()
-    assert pd == {}
+    print(pd.to_dict())
     assert pd.has_attr('int_key') is True
     assert pd.has_attr('undefined key') is False
 
@@ -140,13 +140,11 @@ def test_annotated_attr_names():
 
 def test_advanced_attr_names():
     pd = AdvancedKeyValue()
-    assert pd == {}
     assert set(pd.attr_names()) == {'tuple_key', 'list_key', 'dict_key'}
 
 
 def test_setting_and_getting_advanced_attrs():
     pd = AdvancedKeyValue()
-    assert pd == {}
     assert set(pd.attr_names()) == {'tuple_key', 'list_key', 'dict_key'}
 
     pd.tuple_key = (1, 2)
@@ -165,7 +163,7 @@ def test_setting_and_getting_advanced_attrs():
 def test_list_annotation():
     print("== test_list_annotation ==")
     pd = ListProdict()
-    assert pd == {}
+    # assert pd == {}
     assert set(pd.attr_names()) == {'li', 'li_int', 'li_str'}
 
     print("test List")
@@ -182,7 +180,7 @@ def test_list_annotation():
 
 def test_recursive_annotations1():
     r = Recursive()
-    assert r == {}
+    # assert r == {}
     assert set(r.attr_names()) == {'prodict_key', 'simple_key'}
 
     r.prodict_key = Prodict(a=1)
@@ -272,7 +270,7 @@ class Computer(Prodict):
         return sum([ram.capacity for ram in self.rams])
 
     def total_ram2(self):
-        if 'rams2' in self:
+        if 'rams2' in self and self['rams2'] is not None:
             return sum([ram.capacity for ram in self.rams2])
         return 0
 
@@ -488,17 +486,31 @@ def test_unknown_attr():
     # Should fail
     try:
         print(ram['flavor'])
-        assert(False)
+        assert False
     except KeyError:
         pass
 
     # Should fail
     try:
         print(ram.flavor)
-        assert(False)
+        assert False
     except KeyError:
         pass
 
+
+def test_default_none():
+    class Car(Prodict):
+        brand: str
+        year: int
+
+    honda = Car(brand='Honda')
+    print('honda.year:', honda.year)
+    assert honda.year is None
+    try:
+        print(honda.color)  # This also raises KeyError since it is not even defined or set.
+        raise Exception("'honda.color' must raise KeyError")
+    except KeyError:
+        print("'honda.color' raises KeyError. Ok")
 
 
 if __name__ == '__main__':
@@ -531,6 +543,7 @@ if __name__ == '__main__':
     test_deepcopy1()
     test_deepcopy2()
     test_unknown_attr()
+    test_default_none()
 
     end_time = datetime.now().timestamp()
 

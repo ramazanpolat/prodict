@@ -17,6 +17,11 @@ class Prodict(dict):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        # Set all properties to None (https://github.com/ramazanpolat/prodict/issues/3)
+        for k, v in self.attr_types().items():
+            self.set_attribute(k, None)
+
         # Set default values of annotated attributes
         # for k, v in self.attr_types().items():
         #     if self.attr_has_default_value(k):
