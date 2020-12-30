@@ -187,17 +187,7 @@ for post in user.posts:
 
 ```
 
-With **Prodict** becomes this:
-
-```python
-user = Prodict.from_dict(requests.get("https://some.restservice.com/user/1").json())
-
-for post in user.posts:
-    print(post.title)
-```
-**YES! That's it**. Only one line of code makes it happen!
-
-If you want to have code completion, you can define your classes like this:
+With **Prodict** you just need to define the classes and let the prodict do the rest like this:
 
 ```python
 class Comment(Prodict):
