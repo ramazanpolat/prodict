@@ -35,6 +35,7 @@ jobs:
         python setup.py sdist
         twine check dist/*
     - name: Twine test upload to testpypi
+      if: github.ref == 'refs/heads/master'
       run: |
         sed -i 's/TESTPYPI_TOKEN/${{ secrets.TESTPYPI_TOKEN }}/' .pypirc
         sed -i 's/PYPI_TOKEN/${{ secrets.PYPI_TOKEN }}/' .pypirc
@@ -43,6 +44,7 @@ jobs:
         twine upload --repository testpypi dist/*
 
     - name: Twine upload to pypi
+      if: github.ref == 'refs/heads/master'
       run: |
         twine upload dist/*
       
