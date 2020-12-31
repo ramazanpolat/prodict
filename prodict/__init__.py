@@ -10,6 +10,18 @@ class GenericMeta(type):
     pass
 
 
+def _dict_value(v, is_recursive, exclude_none):
+    if is_recursive and isinstance(v, Prodict):
+        return v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none)
+    return v
+
+
+def _none_condition(v, is_recursive, exclude_none):
+    if not exclude_none:
+        return True
+    return False if v is None else True
+
+
 class Prodict(dict):
     """
     Prodict = Dictionary with IDE friendly(auto code completion), dot-accessible attributes and more.
@@ -96,6 +108,12 @@ class Prodict(dict):
             self.update({attr_name: attr_default_value})
 
     def get_constructor(self, attr_name, value):
+        """
+        This method is used for type conversion.
+        Prodict uses this method to get the type of a value, then based on the value, it return a constructor.
+        If the type of a value is 'float' then it returns 'float' since 'float' is also a constructor to build a float
+        value.
+        """
         attr_type1 = self.attr_type(attr_name)
         constructor = None
         element_type = None
@@ -222,5 +240,20 @@ class Prodict(dict):
     def __setattr__(self, name: str, value) -> None:
         self.set_attribute(name, value)
 
-    def to_dict(self):
-        return dict(self)
+    def to_dict(self, *args, is_recursive=False, exclude_none=False, **kwargs):
+        ret = {k: _dict_value(v, is_recursive=is_recursive, exclude_none=exclude_none)
+               for k, v in self.items()
+               if _none_condition(v, is_recursive=is_recursive, exclude_none=exclude_none)}
+
+        # another way to do it
+        # ret2 = {}
+        # for k, v in self.items():
+        #     # print(k, v)
+        #     if exclude_none and v is None:
+        #         continue
+        #     if is_recursive and isinstance(v, Prodict):
+        #         vv = v.to_dict()
+        #     else:
+        #         vv = v
+        #     ret2[k] = vv
+        return ret
