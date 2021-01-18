@@ -404,3 +404,15 @@ class TestProdict(TestCase):
         p = User.from_dict(json1)
         assert len(p.posts) == 2
         assert type(p.posts[0].title) == str
+
+    def test_issue15(self):
+        """url: https://github.com/ramazanpolat/prodict/issues/15
+        if the payload has a attribute named 'self' then we get a TypeError:
+            TypeError: __init__() got multiple values for argument 'self'
+
+        """
+        try:
+            p = Prodict(self=1)
+            assert True
+        except TypeError:
+            assert False
