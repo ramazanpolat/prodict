@@ -1,9 +1,11 @@
 from distutils.core import setup
 
+version = '0.8.14'
+
 setup(
     name='prodict',
     packages=['prodict'],  # this must be the same as the name above
-    version='0.8.13',
+    version=version,
     description='Prodict = Pro Dictionary with IDE friendly(auto code completion), dot-accessible attributes and more.',
     long_description='Ever wanted to use a dict like a class and access keys as attributes? '
                      'Prodict does exactly this.'
@@ -12,7 +14,7 @@ setup(
     author='Ramazan Polat',
     author_email='ramazanpolat@gmail.com',
     url='https://github.com/ramazanpolat/prodict',
-    download_url='https://pypi.python.org/pypi/prodict/0.8.13',
+    download_url='https://pypi.python.org/pypi/prodict/' + version,
     keywords=['prodict', 'python3', 'typehinting', 'dynamic-props', 'dict', 'dictionary', 'auto-complete',
               'auto-code-complete'],
     classifiers=['Development Status :: 4 - Beta',
