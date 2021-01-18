@@ -22,30 +22,35 @@ def _none_condition(v, is_recursive, exclude_none):
     return False if v is None else True
 
 
+# noinspection PyMethodParameters
 class Prodict(dict):
     """
     Prodict = Dictionary with IDE friendly(auto code completion), dot-accessible attributes and more.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, **kwargs):
         super().__init__(**kwargs)
 
+        """
+        'self' parameter name is changed because of #15: https://github.com/ramazanpolat/prodict/issues/15 
+        """
+
         # Set all properties to None (https://github.com/ramazanpolat/prodict/issues/3)
-        for k, v in self.attr_types().items():
-            self.set_attribute(k, None)
+        for k, v in self_d921dfa9_4e93_4123_893d_a7e7eb783a32.attr_types().items():
+            self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, None)
 
         # Set default values of annotated attributes
         # for k, v in self.attr_types().items():
         #     if self.attr_has_default_value(k):
         #         self.set_default(k)
-        self.init()
-        self.set_attributes(**kwargs)
+        self_d921dfa9_4e93_4123_893d_a7e7eb783a32.init()
+        self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attributes(**kwargs)
 
-    def init(self):
+    def init(self_d921dfa9_4e93_4123_893d_a7e7eb783a32):
         ...
 
     def __deepcopy__(self, memo=None):
-        print("__deepcopy__ type(self):", type(self))
+        # print("__deepcopy__ type(self):", type(self))
         new = self.from_dict({})
         for key in self.keys():
             new.set_attribute(key, copy.deepcopy(self[key], memo=memo))
@@ -223,9 +228,12 @@ class Prodict(dict):
     #     else:
     #         self[attr_name] = value
 
-    def set_attributes(self, **d):
+    def set_attributes(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, **d):
         for k, v in d.items():
-            self.set_attribute(k, v)
+            self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, v)
+        """
+        'self' parameter name is changed because of #15: https://github.com/ramazanpolat/prodict/issues/15 
+        """
 
     def __getattr__(self, item):
         # print('__getattr__("{}")'.format(item))
