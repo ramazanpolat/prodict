@@ -416,3 +416,17 @@ class TestProdict(TestCase):
             assert True
         except TypeError:
             assert False
+
+    def test_accept_generator(self):
+        """
+        https://github.com/ramazanpolat/prodict/issues/18
+        """
+        s = ';O2Sat:92;HR:62;RR:0'
+
+        # this works
+        dd1 = dict(x.split(':') for x in s.split(';') if ':' in x)
+
+        # this fails with TypeError: __init__() takes 1 positional argument but 2 were given
+        pd1 = Prodict(x.split(':') for x in s.split(';') if ':' in x)
+        print(pd1)
+        assert True

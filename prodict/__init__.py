@@ -28,8 +28,8 @@ class Prodict(dict):
     Prodict = Dictionary with IDE friendly(auto code completion), dot-accessible attributes and more.
     """
 
-    def __init__(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         """
         'self' parameter name is changed because of #15: https://github.com/ramazanpolat/prodict/issues/15 
@@ -46,7 +46,7 @@ class Prodict(dict):
         self_d921dfa9_4e93_4123_893d_a7e7eb783a32.init()
         self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attributes(**kwargs)
 
-    def init(self_d921dfa9_4e93_4123_893d_a7e7eb783a32):
+    def init(self):
         ...
 
     def __deepcopy__(self, memo=None):
