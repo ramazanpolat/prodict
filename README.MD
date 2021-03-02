@@ -236,18 +236,6 @@ print(issubclass(Prodict, dict))  # True
 print(isinstance(p, dict))  # True
 print(set(dir(dict)).issubset(dir(Prodict)))  # True
 ```
-One difference between a `Prodict` and `dict` is, since you can set any attribute dynamically, you can also ask for any attribute and Prodict returns `None` if no value is set for that attribute name, while `dict` raises KeyError in that case.
-
-For example:
-```python
-a = dict(my_key=1)
-print(a['my_key']) # 1
-print(a['undefined_key']) # KeyError: 'undefined_key'
-
-p = Prodict(my_key=1)
-print(p.my_key) # 1
-print(p.undefined_key]) # None
-```
 
 **Example 1**: Accessing keys as attributes and auto completion.
 ```python
