@@ -49,6 +49,21 @@ class Prodict(dict):
     def init(self):
         ...
 
+    def __new__(cls, *args, **kwargs):
+        return super(Prodict, cls).__new__(cls, *args, **kwargs)
+
+    def __getstate__(self):
+        return self.to_dict()
+
+    def __setstate__(self, state):
+        return Prodict.from_dict(state)
+
+    # def __getnewargs__(self):
+    #     return tuple([None, None])
+    #
+    # def __getnewargs_ex__(self):
+    #     return tuple([None, None])
+
     def __deepcopy__(self, memo=None):
         # print("__deepcopy__ type(self):", type(self))
         new = self.from_dict({})

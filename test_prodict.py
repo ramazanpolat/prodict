@@ -1,3 +1,4 @@
+import pickle
 from unittest import TestCase
 from typing import List, Any, Tuple
 import unittest
@@ -430,3 +431,16 @@ class TestProdict(TestCase):
         pd1 = Prodict(x.split(':') for x in s.split(';') if ':' in x)
         print(pd1)
         assert True
+
+    def test_pickle(self):
+        try:
+            encoded = pickle.dumps(Prodict(a=42))
+            decoded = pickle.loads(encoded)
+            assert decoded.a == 42
+            # p = Prodict(a=1, b=2)
+            # encoded = pickle.dumps(p)
+            # print(encoded)
+            # decoded = pickle.loads(encoded)
+            # print(decoded)
+        except:
+            assert False
