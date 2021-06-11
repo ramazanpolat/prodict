@@ -369,16 +369,22 @@ class TestProdict(TestCase):
         }
 
         model = ModelConfig.from_dict(data)
-        d1 = model.to_dict(exclude_none=True, is_recursive=True, exclude_none_in_lists=True)
+        d1 = model.to_dict(exclude_none=True, is_recursive=False, exclude_none_in_lists=True)
         print(d1)
         assert 'my_var' not in d1
         assert 'some_dict' not in d1['my_list'][1]
 
-        d2 = model.to_dict(exclude_none=True, is_recursive=True, exclude_none_in_lists=False)
+        d2 = model.to_dict(exclude_none=True, exclude_none_in_lists=False)
 
         print(d2)
         assert 'my_var' not in d2
         assert 'some_dict' in d2['my_list'][1]
+
+        d2 = model.to_dict(exclude_none_in_lists=True)
+
+        print(d2)
+        assert 'my_var' in d2
+        assert 'some_dict' not in d2['my_list'][1]
 
 
 
