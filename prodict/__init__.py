@@ -1,4 +1,4 @@
-from typing import Any, List, TypeVar, Tuple
+from typing import Any, List, TypeVar, Tuple, get_type_hints
 import copy
 
 # from typing_inspect import get_parameters
@@ -10,9 +10,13 @@ class GenericMeta(type):
     pass
 
 
-def _dict_value(v, is_recursive, exclude_none):
+def _dict_value(v, is_recursive, exclude_none, exclude_none_in_lists):
     if is_recursive and isinstance(v, Prodict):
         return v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none)
+    if exclude_none_in_lists and isinstance(v, List):
+        return [
+            item.to_dict(exclude_none=exclude_none, is_recursive=is_recursive) if isinstance(item, Prodict) else item
+            for item in v]
     return v
 
 
@@ -263,8 +267,33 @@ class Prodict(dict):
     def __setattr__(self, name: str, value) -> None:
         self.set_attribute(name, value)
 
-    def to_dict(self, *args, is_recursive=False, exclude_none=False, **kwargs):
-        ret = {k: _dict_value(v, is_recursive=is_recursive, exclude_none=exclude_none)
+    def to_dict(self, *args, is_recursive=False, exclude_none=False, exclude_none_in_lists=False, **kwargs):
+        # def get_value(v):
+        #     if isinstance(v, List):
+        #
+        #     if is_recursive:
+        #
+        # def list_without_none(a_list: List):
+        #     return [elem for elem in a_list if elem is not None]
+
+        # ret = {k: v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none) if isinstance(v, Prodict) else v
+        #        for k, v in self.items()
+        #        if v or not exclude_none}
+
+        # if not is_recursive and not exclude_none:
+        #     ret = {k: v for k, v in self.items()}
+        # elif is_recursive and not exclude_none:
+        #     ret = {k: v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none) if isinstance(v, Prodict) else v
+        #            for k, v in self.items()}
+        # elif not is_recursive and exclude_none:
+        #     ret = {k: v for k, v in self.items() if v is not None}
+        # else:
+        #     ret = {k: v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none) if isinstance(v, Prodict) else v
+        #            for k, v in self.items() if v}
+
+        ret = {k: _dict_value(v, is_recursive=is_recursive,
+                              exclude_none=exclude_none,
+                              exclude_none_in_lists=exclude_none_in_lists)
                for k, v in self.items()
                if _none_condition(v, is_recursive=is_recursive, exclude_none=exclude_none)}
 

@@ -344,6 +344,46 @@ class TestProdict(TestCase):
 
         print(type(son.to_dict()['father'].to_dict()))
 
+    def test_to_dict_exclude_none_for_list_elements(self):
+        class MyEntry(Prodict):
+            some_str: str
+            some_dict: Prodict
+
+        class ModelConfig(Prodict):
+            my_list: List[MyEntry]
+            my_var: str
+
+        data = {
+            "my_list": [
+                {
+                    "some_str": "Hello",
+                    "some_dict": {
+                        "name": "Frodo",
+                    }
+                },
+                {
+                    "some_str": "World"
+                }
+            ],
+            "my_var": None
+        }
+
+        model = ModelConfig.from_dict(data)
+        d1 = model.to_dict(exclude_none=True, is_recursive=True, exclude_none_in_lists=True)
+        print(d1)
+        assert 'my_var' not in d1
+        assert 'some_dict' not in d1['my_list'][1]
+
+        d2 = model.to_dict(exclude_none=True, is_recursive=True, exclude_none_in_lists=False)
+
+        print(d2)
+        assert 'my_var' not in d2
+        assert 'some_dict' in d2['my_list'][1]
+
+
+
+
+
     def test_issue12(self):
         class Comment(Prodict):
             user_id: int
