@@ -41,7 +41,8 @@ class Prodict(dict):  # type: ignore
 
     def __init__(
         self_d921dfa9_4e93_4123_893d_a7e7eb783a32,  # noqa
-        *args: Any, **kwargs: Any
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
 
@@ -195,8 +196,7 @@ class Prodict(dict):  # type: ignore
                     else:
                         element_constructor = element_type
 
-                    for v in value_list:
-                        new_list.append(element_constructor(v))
+                    new_list.extend(element_constructor(v) for v in value_list)
                     self.update({attr_name: new_list})
                 elif constructor == list:
                     self.update({attr_name: list(value)})
@@ -232,7 +232,7 @@ class Prodict(dict):  # type: ignore
         exclude_none_in_lists: bool = False,
         **kwargs: Any,
     ) -> Dict[Any, Any]:
-        ret = {
+        return {
             k: _dict_value(
                 v,
                 is_recursive=is_recursive,
@@ -240,8 +240,5 @@ class Prodict(dict):  # type: ignore
                 exclude_none_in_lists=exclude_none_in_lists,
             )
             for k, v in self.items()
-            if _none_condition(
-                v, exclude_none=exclude_none
-            )
+            if _none_condition(v, exclude_none=exclude_none)
         }
-        return ret
