@@ -1,7 +1,7 @@
 import contextlib
 import pickle
 from unittest import TestCase
-from typing import List, Any, Dict, Tuple
+from typing import List, Any, Dict, Tuple, Optional
 from prodict import Prodict
 import copy
 
@@ -61,7 +61,7 @@ class AnyType(Prodict):
 
 class SimpleKeyValue(Prodict):
     int_key: int
-    str_key: str
+    str_key: Optional[str]  # #8: For mypy: It shall know that = None is fine
     float_key: float
 
 
@@ -152,7 +152,7 @@ class TestProdict(TestCase):
         pd.str_key = 'str1'
         assert pd.str_key == 'str1'
 
-        pd.str_key = None  # type: ignore
+        pd.str_key = None
         assert pd.str_key is None
 
         pd.dynamic_int = 1
