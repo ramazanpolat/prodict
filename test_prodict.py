@@ -88,7 +88,42 @@ class Recursive(Prodict):
     simple_key: SimpleKeyValue
 
 
+class ProdictWithStringsInTuples(Prodict):
+    def __getattr__(self, attribute_name: str) -> Any:
+        value = super().__getattr__(attribute_name)
+        if type(value) == tuple and value[0] == "s":
+            return value[1]
+        return value
+
+
 class TestProdict(TestCase):
+    def test_extension_to_return_string_in_tuple(self) -> None:
+        """test to get the get string in the tuple"""
+        string_in_tuple_dict = {"tuple": ("s", "string value")}
+        d = ProdictWithStringsInTuples.from_dict(string_in_tuple_dict)
+        assert d.tuple == "string value"
+
+    def test_extension_to_set_and_get_string_in_tuple(self) -> None:
+
+        class ProdictWhereStringIsTuple(ProdictWithStringsInTuples):
+            @staticmethod
+            def stringtuple(value: Any) -> Tuple[str, str]:
+                return ("s", str(value))
+
+            def get_constructor(self, attr_name: str, value: Any) -> Any:
+                attribute_type = self.attr_type(attr_name)
+                if attribute_type == str and type(value) == str:
+                    return self.stringtuple, None
+                return super().get_constructor(attr_name, value)
+
+        class ProDictWithTupleString(ProdictWhereStringIsTuple):
+            id: str
+
+        s = ProDictWithTupleString()
+        s.id = "hello"
+        assert type(s.id) == str
+        assert s["id"] == ("s", "hello")
+
     def test_item_name_dash_mapping(self) -> None:
         """Test custom item map for dashes to underscores and leading digits"""
 
