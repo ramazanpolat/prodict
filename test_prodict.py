@@ -89,6 +89,27 @@ class Recursive(Prodict):
 
 
 class TestProdict(TestCase):
+    def test_item_name_dash_mapping(self) -> None:
+        """Test custom item map for dashes to underscores and leading digits"""
+
+        class ProdictWithDashItemMapping(Prodict):
+            def item_name_for_attribute(self, attribute_name: str) -> str:
+                if attribute_name[0] == "_":
+                    attribute_name = attribute_name[1:]
+                return attribute_name.replace("_", "-")
+
+        class NetworkConnection(ProdictWithDashItemMapping):
+            interface_name: str
+            _802_11_wireless_ssid: str
+
+        networkconnection_dict = {
+            "interface-name": "wlan0",
+            "802-11-wireless-ssid": "cloud9",
+        }
+        networkconnection = NetworkConnection.from_dict(networkconnection_dict)
+        assert networkconnection.interface_name == "wlan0"
+        assert networkconnection._802_11_wireless_ssid == "cloud9"
+
     def test_deep_recursion_from_dict(self) -> None:
         computer_dict = {
             'x_str': 'string',

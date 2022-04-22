@@ -172,21 +172,32 @@ class Prodict(dict):  # type: ignore
         # print('constr={} element_type={}'.format(constructor, element_type))
         return constructor, element_type
 
+    def item_name_for_attribute(self, attribute_name: str) -> str:
+        """May be overridden by subclasses which want special item names"""
+        return attribute_name
+
+    def __item_name_for_attribute(self, attribute_name: str) -> str:
+        """Never map dunder attributes, allow overriding other attributes"""
+        if attribute_name.startswith("__"):
+            return attribute_name
+        return self.item_name_for_attribute(attribute_name)
+
     def set_attribute(self, attr_name: str, value: Any) -> None:
         # sourcery skip: merge-else-if-into-elif, move-assign-in-block
         if attr_name in DICT_RESERVED_KEYS:
             raise TypeError("You cannot set a reserved name as attribute")
+        item_name = self.__item_name_for_attribute(attr_name)
         if self.has_attr(attr_name):
             if value is None:
-                self.update({attr_name: None})
+                self.update({item_name: None})
             elif self.attr_type(attr_name) == Any:
-                self[attr_name] = value
+                self[item_name] = value
             else:
                 constructor, element_type = self.get_constructor(
                     attr_name, value
                 )
                 if constructor is None:
-                    self.update({attr_name: value})
+                    self.update({item_name: value})
                 elif constructor == List:
                     value_list: List[element_type] = value  # type: ignore
                     new_list: List[element_type] = []  # type: ignore
@@ -197,20 +208,20 @@ class Prodict(dict):  # type: ignore
                         element_constructor = element_type
 
                     new_list.extend(element_constructor(v) for v in value_list)
-                    self.update({attr_name: new_list})
+                    self.update({item_name: new_list})
                 elif constructor == list:
-                    self.update({attr_name: list(value)})
+                    self.update({item_name: list(value)})
                 else:
-                    self.update({attr_name: constructor(value)})
+                    self.update({item_name: constructor(value)})
         else:
             if isinstance(value, dict):
                 if isinstance(value, Prodict):
                     constructor = value.from_dict
                 else:
                     constructor = Prodict.from_dict
-                self.update({attr_name: constructor(value)})
+                self.update({item_name: constructor(value)})
             else:
-                self.update({attr_name: value})
+                self.update({item_name: value})
 
     def set_attributes(
         self_d921dfa9_4e93_4123_893d_a7e7eb783a32, **d: Any  # noqa
@@ -218,7 +229,8 @@ class Prodict(dict):  # type: ignore
         for k, v in d.items():
             self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, v)
 
-    def __getattr__(self, item: str) -> Any:
+    def __getattr__(self, attribute_name: str) -> Any:
+        item = self.__item_name_for_attribute(attribute_name)
         return self[item]
 
     def __setattr__(self, name: str, value: Any) -> None:
