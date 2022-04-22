@@ -54,7 +54,6 @@ class Computer(Prodict):
 
 
 class AnyType(Prodict):
-    # x=1 type: Any
     a: Any
     b: Tuple[Any]
     c: Any
@@ -113,23 +112,12 @@ class TestProdict(TestCase):
         }
 
         computer = Computer.from_dict(computer_dict)
-        # print('computer =', computer)
         assert type(computer) == Computer
-        # print('type(computer.dict_key) =', type(computer.dict_key))
         assert type(computer.dict_key) == Prodict
-        # print('computer.brand =', computer.brand)
         assert type(computer.brand) == str
-        # print('computer.cpu =', computer.cpu)
         assert type(computer.cpu) == Cpu
-        # print('type(computer.rams) =', type(computer.rams))
         assert type(computer.rams) == list
-        # print('computer.rams[0] =', computer.rams[0])
         assert type(computer.rams[0]) == Ram
-        print('Total ram =', computer.total_ram())
-        print('Total ram2 =', computer.total_ram2())
-        print("computer['rams'] =", computer['rams'])
-        print("type(computer['rams']) =", type(computer['rams']))
-        print("computer['rams'][0] =", computer['rams'][0])
 
     def test_bracket_access(self) -> None:
         pd = SimpleKeyValue()
@@ -211,19 +199,7 @@ class TestProdict(TestCase):
 
     def test_deepcopy1(self) -> None:
         root_node = Prodict(number=1, data="ROOT node", next=None)
-
         copied = copy.deepcopy(root_node)
-
-        print("--root-node id:", id(root_node))
-        print(root_node)
-        print("--copied id:", id(copied))
-        print(copied)
-        print("--root_node.data")
-        print(type(root_node))
-        print(root_node.data)
-        print("--copied.data")
-        print(type(copied))
-        print(copied.data)
 
         # have same dict
         assert copied == root_node
@@ -239,22 +215,7 @@ class TestProdict(TestCase):
             next: Prodict
 
         root_node = MyLinkListNode(number=1, data="ROOT node", next=None)
-        # node1 = MyLinkListNode(number=2, data="1st node", next=None)
-        # root_node.next = node1
-
         copied = copy.deepcopy(root_node)
-        # copied.number += 1
-
-        print("--root-node id:", id(root_node))
-        print(root_node)
-        print("--copied id:", id(copied))
-        print(copied)
-        print("--root_node.data")
-        print(type(root_node))
-        print(root_node.data)
-        print("--copied.data")
-        print(type(copied))
-        print(copied.data)
 
         # have same dict
         assert copied == root_node
@@ -295,15 +256,7 @@ class TestProdict(TestCase):
     def test_to_dict_recursive(self) -> None:
         dad = Dad(name='Bob')
         son = Son(name='Jeremy', father=dad)
-
-        # print('dad dict:', dad.to_dict())
-        # print('--')
-        # print('son dict:', son.to_dict())
-        # print('--')
-
-        # print(type(son.to_dict(is_recursive=False)['father']))
         assert type(son.to_dict(is_recursive=False)['father']) == Dad
-        # print(type(son.to_dict(is_recursive=True)['father']))
         assert type(son.to_dict(is_recursive=True)['father']) == dict
 
     def test_to_dict_exclude_none(self) -> None:
@@ -318,20 +271,6 @@ class TestProdict(TestCase):
             'age'
             not in son.to_dict(is_recursive=True, exclude_none=True)['father']
         )
-
-        print('exclude_none=False:', son.to_dict(exclude_none=False))
-        print('exclude_none=True:', son.to_dict(exclude_none=True))
-
-        print(
-            'exclude_none=False:',
-            son.to_dict(exclude_none=False, is_recursive=True),
-        )
-        print(
-            'exclude_none=True:',
-            son.to_dict(exclude_none=True, is_recursive=True),
-        )
-
-        print(type(son.to_dict()['father'].to_dict()))
 
     def test_to_dict_exclude_none_for_list_elements(self) -> None:
         class MyEntry(Prodict):
@@ -359,19 +298,14 @@ class TestProdict(TestCase):
         d1 = model.to_dict(
             exclude_none=True, is_recursive=False, exclude_none_in_lists=True
         )
-        print(d1)
         assert 'my_var' not in d1
         assert 'some_dict' not in d1['my_list'][1]
 
         d2 = model.to_dict(exclude_none=True, exclude_none_in_lists=False)
-
-        print(d2)
         assert 'my_var' not in d2
         assert 'some_dict' in d2['my_list'][1]
 
         d2 = model.to_dict(exclude_none_in_lists=True)
-
-        print(d2)
         assert 'my_var' in d2
         assert 'some_dict' not in d2['my_list'][1]
 
@@ -469,10 +403,5 @@ class TestProdict(TestCase):
             encoded = pickle.dumps(Prodict(a=42))
             decoded = pickle.loads(encoded)
             assert decoded.a == 42
-            # p = Prodict(a=1, b=2)
-            # encoded = pickle.dumps(p)
-            # print(encoded)
-            # decoded = pickle.loads(encoded)
-            # print(decoded)
         except Exception:
             assert False
