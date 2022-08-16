@@ -322,7 +322,7 @@ class MyDataWithDefaults(Prodict):
 
 data = MyDataWithDefaults(dynamic=43)
 print(data)
-# {'an_int':43, 'a_str':'string', 'dynamic':43}
+# {'an_int':42, 'a_str':'string', 'dynamic':43}
 
 ``` 
 
