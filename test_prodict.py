@@ -1,8 +1,7 @@
+import contextlib
 import pickle
 from unittest import TestCase
-from typing import List, Any, Tuple
-import unittest
-from datetime import datetime
+from typing import List, Any, Dict, Tuple
 from prodict import Prodict
 import copy
 
@@ -41,23 +40,22 @@ class Computer(Prodict):
     brand: str
     cpu: Cpu
     rams: List[Ram]
-    dict_key: dict
+    dict_key: dict  # type: ignore
     uninitialized: str
     rams2: List[Ram]
 
-    def total_ram(self):
+    def total_ram(self) -> int:  # sourcery skip: comprehension-to-generator
         return sum([ram.capacity for ram in self.rams])
 
-    def total_ram2(self):
+    def total_ram2(self) -> int:  # sourcery skip: comprehension-to-generator
         if 'rams2' in self and self['rams2'] is not None:
             return sum([ram.capacity for ram in self.rams2])
         return 0
 
 
 class AnyType(Prodict):
-    # x=1 type: Any
     a: Any
-    b: Tuple
+    b: Tuple[Any]
     c: Any
 
 
@@ -74,13 +72,13 @@ class SimpleKeyDefaultValue(Prodict):
 
 
 class AdvancedKeyValue(Prodict):
-    tuple_key: tuple
-    list_key: list
-    dict_key: dict
+    tuple_key: Tuple[Any]
+    list_key: List[Any]
+    dict_key: Dict[Any, Any]
 
 
 class ListProdict(Prodict):
-    li: List
+    li: List[Any]
     li_str: List[str]
     li_int: List[int]
 
@@ -91,7 +89,7 @@ class Recursive(Prodict):
 
 
 class TestProdict(TestCase):
-    def test_deep_recursion_from_dict(self):
+    def test_deep_recursion_from_dict(self) -> None:
         computer_dict = {
             'x_str': 'string',
             'x_int': 0,
@@ -99,68 +97,41 @@ class TestProdict(TestCase):
             'dict_key': {'info': 'This must be a dict'},
             'brand': 'acme',
             'rams': [
-                {
-                    'brand': 'Kingston',
-                    'capacity': 4,
-                    'unit': 'GB'
-                },
-                {
-                    'brand': 'Samsung',
-                    'capacity': 8,
-                    'unit': 'GB'
-
-                }],
+                {'brand': 'Kingston', 'capacity': 4, 'unit': 'GB'},
+                {'brand': 'Samsung', 'capacity': 8, 'unit': 'GB'},
+            ],
             'cpu': {
                 'brand': 'Intel',
                 'model': 'i5-4670',
                 'cache': 3,
                 'cores': [
-                    {
-                        'threads': 2,
-                        'clock': 3.4,
-                        'unit': 'GHz'
-                    },
-                    {
-                        'threads': 4,
-                        'clock': 3.1,
-                        'unit': 'GHz'
-                    }
-                ]
-            }
+                    {'threads': 2, 'clock': 3.4, 'unit': 'GHz'},
+                    {'threads': 4, 'clock': 3.1, 'unit': 'GHz'},
+                ],
+            },
         }
 
-        computer: Computer = Computer.from_dict(computer_dict)
-        # print('computer =', computer)
+        computer = Computer.from_dict(computer_dict)
         assert type(computer) == Computer
-        # print('type(computer.dict_key) =', type(computer.dict_key))
         assert type(computer.dict_key) == Prodict
-        # print('computer.brand =', computer.brand)
         assert type(computer.brand) == str
-        # print('computer.cpu =', computer.cpu)
         assert type(computer.cpu) == Cpu
-        # print('type(computer.rams) =', type(computer.rams))
         assert type(computer.rams) == list
-        # print('computer.rams[0] =', computer.rams[0])
         assert type(computer.rams[0]) == Ram
-        print('Total ram =', computer.total_ram())
-        print('Total ram2 =', computer.total_ram2())
-        print("computer['rams'] =", computer['rams'])
-        print("type(computer['rams']) =", type(computer['rams']))
-        print("computer['rams'][0] =", computer['rams'][0])
 
-    def test_bracket_access(self):
+    def test_bracket_access(self) -> None:
         pd = SimpleKeyValue()
         pd.str_key = 'str_value_123'
         assert pd['str_key'] == pd.str_key
         assert pd.get('str_key') == pd.str_key
 
-    def test_null_assignment(self):
+    def test_null_assignment(self) -> None:
         pd = SimpleKeyValue()
 
         pd.str_key = 'str1'
         assert pd.str_key == 'str1'
 
-        pd.str_key = None
+        pd.str_key = None  # type: ignore
         assert pd.str_key is None
 
         pd.dynamic_int = 1
@@ -175,7 +146,7 @@ class TestProdict(TestCase):
         pd.dynamic_str = None
         assert pd.dynamic_str is None
 
-    def test_multiple_instances(self):
+    def test_multiple_instances(self) -> None:
         class Multi(Prodict):
             a: int
 
@@ -187,7 +158,7 @@ class TestProdict(TestCase):
 
         assert m2.a == m1.a + 1
 
-    def test_property(self):
+    def test_property(self) -> None:
         class PropertyClass(Prodict):
             first: int
             second: int
@@ -201,12 +172,12 @@ class TestProdict(TestCase):
         pc = PropertyClass(first=first, second=second)
         assert pc.diff == abs(second - first)
 
-    def test_use_defaults_method(self):
+    def test_use_defaults_method(self) -> None:
         class WithDefault(Prodict):
             a: int
             b: str
 
-            def init(self):
+            def init(self) -> None:
                 self.a = 1
                 self.b = 'string'
 
@@ -214,7 +185,7 @@ class TestProdict(TestCase):
         assert wd.a == 1
         assert wd.b == 'string'
 
-    def test_type_conversion(self):
+    def test_type_conversion(self) -> None:
         class TypeConversionClass(Prodict):
             an_int: int
             a_str: str
@@ -226,21 +197,9 @@ class TestProdict(TestCase):
         assert TypeConversionClass(a_float=123.45).a_float == 123.45
         assert TypeConversionClass(a_float='123.45').a_float == 123.45
 
-    def test_deepcopy1(self):
+    def test_deepcopy1(self) -> None:
         root_node = Prodict(number=1, data="ROOT node", next=None)
-
         copied = copy.deepcopy(root_node)
-
-        print("--root-node id:", id(root_node))
-        print(root_node)
-        print("--copied id:", id(copied))
-        print(copied)
-        print("--root_node.data")
-        print(type(root_node))
-        print(root_node.data)
-        print("--copied.data")
-        print(type(copied))
-        print(copied.data)
 
         # have same dict
         assert copied == root_node
@@ -249,29 +208,14 @@ class TestProdict(TestCase):
         # have same type
         assert type(root_node) is type(copied)
 
-    def test_deepcopy2(self):
+    def test_deepcopy2(self) -> None:
         class MyLinkListNode(Prodict):
             number: int
             data: Any
             next: Prodict
 
         root_node = MyLinkListNode(number=1, data="ROOT node", next=None)
-        # node1 = MyLinkListNode(number=2, data="1st node", next=None)
-        # root_node.next = node1
-
         copied = copy.deepcopy(root_node)
-        # copied.number += 1
-
-        print("--root-node id:", id(root_node))
-        print(root_node)
-        print("--copied id:", id(copied))
-        print(copied)
-        print("--root_node.data")
-        print(type(root_node))
-        print(root_node.data)
-        print("--copied.data")
-        print(type(copied))
-        print(copied.data)
 
         # have same dict
         assert copied == root_node
@@ -280,25 +224,20 @@ class TestProdict(TestCase):
         # have same type
         assert type(root_node) is type(copied)
 
-    def test_unknown_attr(self):
+    def test_unknown_attr(self) -> None:
         ram = Ram.from_dict({'brand': 'Samsung', 'capacity': 4, 'unit': 'YB'})
         print(ram.brand)  # Ok
 
         # Should fail
-        try:
+        with contextlib.suppress(KeyError):
             print(ram['flavor'])
             assert False
-        except KeyError:
-            pass
-
         # Should fail
-        try:
+        with contextlib.suppress(KeyError):
             print(ram.flavor)
             assert False
-        except KeyError:
-            pass
 
-    def test_default_none(self):
+    def test_default_none(self) -> None:  # sourcery skip: raise-specific-error
         class Car(Prodict):
             brand: str
             year: int
@@ -307,26 +246,20 @@ class TestProdict(TestCase):
         print('honda.year:', honda.year)
         assert honda.year is None
         try:
-            print(honda.color)  # This also raises KeyError since it is not even defined or set.
+            print(
+                honda.color
+            )  # This also raises KeyError since it is not even defined or set.
             raise Exception("'honda.color' must raise KeyError")
         except KeyError:
             print("'honda.color' raises KeyError. Ok")
 
-    def test_to_dict_recursive(self):
+    def test_to_dict_recursive(self) -> None:
         dad = Dad(name='Bob')
         son = Son(name='Jeremy', father=dad)
-
-        # print('dad dict:', dad.to_dict())
-        # print('--')
-        # print('son dict:', son.to_dict())
-        # print('--')
-
-        # print(type(son.to_dict(is_recursive=False)['father']))
         assert type(son.to_dict(is_recursive=False)['father']) == Dad
-        # print(type(son.to_dict(is_recursive=True)['father']))
         assert type(son.to_dict(is_recursive=True)['father']) == dict
 
-    def test_to_dict_exclude_none(self):
+    def test_to_dict_exclude_none(self) -> None:
         dad = Dad(name='Bob')
         son = Son(name='Jeremy', father=dad)
 
@@ -334,17 +267,12 @@ class TestProdict(TestCase):
         assert 'age' not in son.to_dict(exclude_none=True)
 
         assert 'age' in son.to_dict()['father']
-        assert 'age' not in son.to_dict(is_recursive=True, exclude_none=True)['father']
+        assert (
+            'age'
+            not in son.to_dict(is_recursive=True, exclude_none=True)['father']
+        )
 
-        print('exclude_none=False:', son.to_dict(exclude_none=False))
-        print('exclude_none=True:', son.to_dict(exclude_none=True))
-
-        print('exclude_none=False:', son.to_dict(exclude_none=False, is_recursive=True))
-        print('exclude_none=True:', son.to_dict(exclude_none=True, is_recursive=True))
-
-        print(type(son.to_dict()['father'].to_dict()))
-
-    def test_to_dict_exclude_none_for_list_elements(self):
+    def test_to_dict_exclude_none_for_list_elements(self) -> None:
         class MyEntry(Prodict):
             some_str: str
             some_dict: Prodict
@@ -359,38 +287,29 @@ class TestProdict(TestCase):
                     "some_str": "Hello",
                     "some_dict": {
                         "name": "Frodo",
-                    }
+                    },
                 },
-                {
-                    "some_str": "World"
-                }
+                {"some_str": "World"},
             ],
-            "my_var": None
+            "my_var": None,
         }
 
         model = ModelConfig.from_dict(data)
-        d1 = model.to_dict(exclude_none=True, is_recursive=False, exclude_none_in_lists=True)
-        print(d1)
+        d1 = model.to_dict(
+            exclude_none=True, is_recursive=False, exclude_none_in_lists=True
+        )
         assert 'my_var' not in d1
         assert 'some_dict' not in d1['my_list'][1]
 
         d2 = model.to_dict(exclude_none=True, exclude_none_in_lists=False)
-
-        print(d2)
         assert 'my_var' not in d2
         assert 'some_dict' in d2['my_list'][1]
 
         d2 = model.to_dict(exclude_none_in_lists=True)
-
-        print(d2)
         assert 'my_var' in d2
         assert 'some_dict' not in d2['my_list'][1]
 
-
-
-
-
-    def test_issue12(self):
+    def test_issue12(self) -> None:
         class Comment(Prodict):
             user_id: int
             comment: str
@@ -419,14 +338,14 @@ class TestProdict(TestCase):
                         {
                             "user_id": 2,
                             "comment": "Good to see you blogging",
-                            "date": "2018-01-02 03:04:06"
+                            "date": "2018-01-02 03:04:06",
                         },
                         {
                             "user_id": 3,
                             "comment": "Good for you",
-                            "date": "2018-01-02 03:04:07"
-                        }
-                    ]
+                            "date": "2018-01-02 03:04:07",
+                        },
+                    ],
                 },
                 {
                     "title": "Hello World 2",
@@ -436,57 +355,53 @@ class TestProdict(TestCase):
                         {
                             "user_id": 2,
                             "comment": "Good to see you blogging",
-                            "date": "2018-01-02 03:04:06"
+                            "date": "2018-01-02 03:04:06",
                         },
                         {
                             "user_id": 3,
                             "comment": "Good for you",
-                            "date": "2018-01-02 03:04:07"
-                        }
-                    ]
-                }
-            ]
+                            "date": "2018-01-02 03:04:07",
+                        },
+                    ],
+                },
+            ],
         }
 
         p = User.from_dict(json1)
         assert len(p.posts) == 2
         assert type(p.posts[0].title) == str
 
-    def test_issue15(self):
+    def test_issue15(self) -> None:
         """url: https://github.com/ramazanpolat/prodict/issues/15
         if the payload has a attribute named 'self' then we get a TypeError:
             TypeError: __init__() got multiple values for argument 'self'
 
         """
         try:
-            p = Prodict(self=1)
+            Prodict(self=1)
             assert True
         except TypeError:
             assert False
 
-    def test_accept_generator(self):
+    def test_accept_generator(self) -> None:
         """
         https://github.com/ramazanpolat/prodict/issues/18
         """
         s = ';O2Sat:92;HR:62;RR:0'
 
         # this works
-        dd1 = dict(x.split(':') for x in s.split(';') if ':' in x)
+        # dd1 = dict(x.split(':') for x in s.split(';') if ':' in x)
 
-        # this fails with TypeError: __init__() takes 1 positional argument but 2 were given
+        # this fails with
+        # TypeError: __init__() takes 1 positional argument but 2 were given
         pd1 = Prodict(x.split(':') for x in s.split(';') if ':' in x)
         print(pd1)
         assert True
 
-    def test_pickle(self):
+    def test_pickle(self) -> None:
         try:
             encoded = pickle.dumps(Prodict(a=42))
             decoded = pickle.loads(encoded)
             assert decoded.a == 42
-            # p = Prodict(a=1, b=2)
-            # encoded = pickle.dumps(p)
-            # print(encoded)
-            # decoded = pickle.loads(encoded)
-            # print(decoded)
-        except:
+        except Exception:
             assert False
