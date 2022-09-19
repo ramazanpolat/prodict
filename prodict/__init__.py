@@ -1,7 +1,5 @@
-from typing import Any, List, TypeVar, Tuple, get_type_hints
+from typing import Any, List
 import copy
-
-# from typing_inspect import get_parameters
 
 DICT_RESERVED_KEYS = vars(dict).keys()
 
@@ -21,9 +19,7 @@ def _dict_value(v, is_recursive, exclude_none, exclude_none_in_lists):
 
 
 def _none_condition(v, is_recursive, exclude_none):
-    if not exclude_none:
-        return True
-    return False if v is None else True
+    return v is not None if exclude_none else True
 
 
 # noinspection PyMethodParameters
@@ -62,30 +58,19 @@ class Prodict(dict):
     def __setstate__(self, state):
         return Prodict.from_dict(state)
 
-    # def __getnewargs__(self):
-    #     return tuple([None, None])
-    #
-    # def __getnewargs_ex__(self):
-    #     return tuple([None, None])
-
     def __deepcopy__(self, memo=None):
-        # print("__deepcopy__ type(self):", type(self))
         new = self.from_dict({})
         for key in self.keys():
             new.set_attribute(key, copy.deepcopy(self[key], memo=memo))
         return new
-        # return copy.deepcopy(self.from_dict(self.to_dict()), memo=memo)
 
     @classmethod
     def from_dict(cls, d: dict):
-        val: cls = cls(**d)
-        return val  # type: cls
+        return cls(**d)
 
     @classmethod
     def attr_has_default_value(cls, attr_name: str) -> bool:
-        if hasattr(cls, attr_name):
-            return True
-        return False
+        return bool(hasattr(cls, attr_name))
 
     @classmethod
     def get_attr_default_value(cls, attr_name: str):
@@ -101,9 +86,6 @@ class Prodict(dict):
     @classmethod
     def attr_types(cls):
         return cls.__annotations__ if hasattr(cls, '__annotations__') else {}
-        # if hasattr(cls, '__annotations__'):
-        #     return cls.__annotations__
-        # return {}
 
     @classmethod
     def attr_names(cls) -> List[str]:
@@ -141,10 +123,6 @@ class Prodict(dict):
         attr_type1 = self.attr_type(attr_name)
         constructor = None
         element_type = None
-        # print('     attr_name="{}" attr_type={} value={}'.format(attr_name, attr_type1, value))
-        # print("attr_type1:", attr_type1)
-        # print("type(attr_type1):", type(attr_type1))
-        # print(dir(attr_type1))
         if attr_type1 == float:
             constructor = float
         elif attr_type1 == str:
@@ -163,7 +141,6 @@ class Prodict(dict):
             elif issubclass(attr_type1, Prodict):
                 constructor = self.attr_type(attr_name).from_dict
         elif attr_type1 is List:
-            # if the type is 'List'
             constructor = list
         elif hasattr(attr_type1, '__origin__'):
             if attr_type1.__dict__['__origin__'] is list:
@@ -220,33 +197,6 @@ class Prodict(dict):
             else:
                 self.update({attr_name: value})
 
-    # def set_attribute(self, attr_name, value):
-    #     if self.has_attr(attr_name):
-    #         if value is None:
-    #             self.update({attr_name: None})
-    #         elif self.attr_type(attr_name) == Any:
-    #             self[attr_name] = value
-    #         elif isinstance(value, Prodict):
-    #             constructor = self.attr_type(attr_name)
-    #             self.update({attr_name: constructor.from_dict(value.to_dict())})
-    #         elif isinstance(value, dict):
-    #             constructor = self.attr_type(attr_name)
-    #             if constructor == dict:
-    #                 self.update({attr_name: Prodict.from_dict(value)})
-    #             # elif constructor == List:
-    #             #     if len(constructor.__args__) != 1:
-    #             #         raise TypeError('Only one dimensional List is supported')
-    #             #     constructor = constructor.__args__[0]
-    #             #     value  # type: List[constructor]
-    #             #     final_list: List[constructor] = []
-    #             #     for elem in value:
-    #             else:
-    #                 self.update({attr_name: constructor.from_dict(value)})
-    #         else:
-    #             self.update({attr_name: self.attr_type(attr_name)(value)})
-    #     else:
-    #         self[attr_name] = value
-
     def set_attributes(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, **d):
         for k, v in d.items():
             self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, v)
@@ -255,57 +205,15 @@ class Prodict(dict):
         """
 
     def __getattr__(self, item):
-        # print('__getattr__("{}")'.format(item))
         return self[item]
-
-    # def __getattribute__(self, item):
-    #     print('__getattribute__("{}")'.format(item))
-    #     if item == '__annotations__':
-    #         return self.__annotations__
-    #     return self.__getattr__(item)
 
     def __setattr__(self, name: str, value) -> None:
         self.set_attribute(name, value)
 
     def to_dict(self, *args, is_recursive=False, exclude_none=False, exclude_none_in_lists=False, **kwargs):
-        # def get_value(v):
-        #     if isinstance(v, List):
-        #
-        #     if is_recursive:
-        #
-        # def list_without_none(a_list: List):
-        #     return [elem for elem in a_list if elem is not None]
-
-        # ret = {k: v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none) if isinstance(v, Prodict) else v
-        #        for k, v in self.items()
-        #        if v or not exclude_none}
-
-        # if not is_recursive and not exclude_none:
-        #     ret = {k: v for k, v in self.items()}
-        # elif is_recursive and not exclude_none:
-        #     ret = {k: v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none) if isinstance(v, Prodict) else v
-        #            for k, v in self.items()}
-        # elif not is_recursive and exclude_none:
-        #     ret = {k: v for k, v in self.items() if v is not None}
-        # else:
-        #     ret = {k: v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none) if isinstance(v, Prodict) else v
-        #            for k, v in self.items() if v}
-
         ret = {k: _dict_value(v, is_recursive=is_recursive,
                               exclude_none=exclude_none,
                               exclude_none_in_lists=exclude_none_in_lists)
                for k, v in self.items()
                if _none_condition(v, is_recursive=is_recursive, exclude_none=exclude_none)}
-
-        # another way to do it
-        # ret2 = {}
-        # for k, v in self.items():
-        #     # print(k, v)
-        #     if exclude_none and v is None:
-        #         continue
-        #     if is_recursive and isinstance(v, Prodict):
-        #         vv = v.to_dict()
-        #     else:
-        #         vv = v
-        #     ret2[k] = vv
         return ret
