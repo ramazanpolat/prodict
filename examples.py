@@ -1,3 +1,5 @@
+import devtools  # type: ignore
+import rich
 from typing import List
 
 from prodict import Prodict
@@ -20,6 +22,7 @@ print(set(dir(dict)).issubset(dir(Prodict)))  # True
 
 # Example 1: Type hinting
 
+
 class Country(Prodict):
     name: str
     population: int
@@ -31,7 +34,11 @@ turkey.population = 79814871
 
 # Example 2: Auto type conversion
 
-germany = Country(name='Germany', population='82175700', flag_colors=['black', 'red', 'yellow'])
+germany = Country(
+    name='Germany',
+    population='82175700',
+    flag_colors=['black', 'red', 'yellow'],
+)
 
 print(germany.population)  # 82175700
 print(type(germany.population))  # <class 'int'>
@@ -53,33 +60,30 @@ class Computer(Prodict):
     cpu_cores: int
     rams: List[Ram]
 
-    def total_ram(self):
-        return sum([ram.capacity for ram in self.rams])
+    def total_ram(self) -> int:
+        return sum(ram.capacity for ram in self.rams)
 
 
 comp1 = Computer.from_dict(
     {
-        'name':
-            'My Computer',
+        'name': 'My Computer',
         'cpu_cores': 4,
-        'rams': [
-            {'capacity': 4,
-             'unit': 'GB',
-             'type': 'DDR3',
-             'clock': 2400}
-        ]
-    })
-print(comp1.rams)  # [{'capacity': 4, 'type': 'DDR3'}]
+        'rams': [{'capacity': 4, 'unit': 'GB', 'type': 'DDR3', 'clock': 2400}],
+    }
+)
+rich.print(comp1.rams)  # [{'capacity': 4, 'type': 'DDR3'}]
 
 comp1.rams.append(Ram(capacity=8, type='DDR3'))
-comp1.rams.append(Ram.from_dict({'capacity': 12, 'type': 'DDR3', 'clock': 2400}))
+comp1.rams.append(
+    Ram.from_dict({'capacity': 12, 'type': 'DDR3', 'clock': 2400})
+)
 
-print(comp1.rams)
+rich.print(comp1.rams)
 # [
 #   {'capacity': 4, 'unit': 'GB', 'type': 'DDR3', 'clock': 2400},
 #   {'capacity': 8, 'type': 'DDR3'},
 #   {'capacity': 12, 'type': 'DDR3', 'clock': 2400}
 # ]
 
-print(type(comp1.rams))
-print(type(comp1.rams[0]))
+devtools.debug(type(comp1.rams))
+devtools.debug(type(comp1.rams[0]))
