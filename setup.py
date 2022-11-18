@@ -19,7 +19,7 @@ setup(
               'auto-code-complete'],
     classifiers=['Development Status :: 4 - Beta',
                  'Intended Audience :: Developers',
-                 'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+                 'License :: OSI Approved :: MIT License',
                  'Programming Language :: Python :: 3.7',
                  'Topic :: Software Development :: Libraries :: Python Modules'],
 )
