@@ -10,11 +10,17 @@ class GenericMeta(type):
 
 def _dict_value(v, is_recursive, exclude_none, exclude_none_in_lists):
     if is_recursive and isinstance(v, Prodict):
-        return v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none)
-    if exclude_none_in_lists and isinstance(v, List):
+        return v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none, exclude_none_in_lists=exclude_none_in_lists)
+    if is_recursive and isinstance(v, List):
         return [
-            item.to_dict(exclude_none=True, is_recursive=is_recursive) if isinstance(item, Prodict) else item
-            for item in v]
+            item.to_dict(
+                exclude_none=exclude_none,
+                exclude_none_in_lists=exclude_none_in_lists,
+                is_recursive=is_recursive
+            ) if isinstance(item, Prodict) else item
+            for item in v
+            if _none_condition(item, is_recursive=is_recursive, exclude_none=exclude_none_in_lists)
+        ]
     return v
 
 
