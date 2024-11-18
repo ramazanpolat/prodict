@@ -308,9 +308,9 @@ class TestProdict(TestCase):
         assert honda.year is None
         try:
             print(honda.color)  # This also raises KeyError since it is not even defined or set.
-            raise Exception("'honda.color' must raise KeyError")
+            raise Exception("'honda.color' must raise AttributeError")
         except AttributeError:
-            print("'honda.color' raises KeyError. Ok")
+            print("'honda.color' raises AttributeError. Ok")
 
     def test_to_dict_recursive(self):
         dad = Dad(name='Bob')
