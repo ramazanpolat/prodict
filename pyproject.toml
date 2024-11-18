@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "prodict"
-version = "0.1.0"
+version = "0.8.20"
 description = "Dictionary with IDE friendly attributes"
 authors = ["Ramazan <ramazanpolat@gmail.com>"]
 license = "MIT"

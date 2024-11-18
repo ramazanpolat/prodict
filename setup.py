@@ -1,6 +1,6 @@
 from distutils.core import setup
 
-version = '0.8.19'
+version = '0.8.20'
 
 setup(
     name='prodict',
