@@ -205,7 +205,10 @@ class Prodict(dict):
         """
 
     def __getattr__(self, item):
-        return self[item]
+        try:
+            return self[item]
+        except KeyError as exc:
+            raise AttributeError(f"{type(self).__name__!r} object has no attribute {exc!s}") from None
 
     def __setattr__(self, name: str, value) -> None:
         self.set_attribute(name, value)
