@@ -1,3 +1,5 @@
+# Global comments:
+# self is avoided to fix #15
 from typing import Any, List
 import copy
 
@@ -13,8 +15,11 @@ def _dict_value(v, is_recursive, exclude_none, exclude_none_in_lists):
         return v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none)
     if exclude_none_in_lists and isinstance(v, List):
         return [
-            item.to_dict(exclude_none=True, is_recursive=is_recursive) if isinstance(item, Prodict) else item
-            for item in v]
+            item.to_dict(exclude_none=True, is_recursive=is_recursive)
+            if isinstance(item, Prodict)
+            else item
+            for item in v
+        ]
     return v
 
 
@@ -25,24 +30,21 @@ def _none_condition(v, is_recursive, exclude_none):
 # noinspection PyMethodParameters
 class Prodict(dict):
     """
-    Prodict = Dictionary with IDE friendly(auto code completion), dot-accessible attributes and more.
+    Prodict = Dictionary with IDE friendly(auto code completion),
+    dot-accessible attributes and more.
     """
 
     def __init__(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        """
-        'self' parameter name is changed because of #15: https://github.com/ramazanpolat/prodict/issues/15 
-        """
-
-        # Set all properties to None (https://github.com/ramazanpolat/prodict/issues/3)
-        for k, v in self_d921dfa9_4e93_4123_893d_a7e7eb783a32.attr_types().items():
+        # #3: Set all properties to None
+        for (
+            k,
+            v,
+        ) in self_d921dfa9_4e93_4123_893d_a7e7eb783a32.attr_types().items():
             self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, None)
 
         # Set default values of annotated attributes
-        # for k, v in self.attr_types().items():
-        #     if self.attr_has_default_value(k):
-        #         self.set_default(k)
         self_d921dfa9_4e93_4123_893d_a7e7eb783a32.init()
         self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attributes(**kwargs)
 
@@ -116,8 +118,9 @@ class Prodict(dict):
     def get_constructor(self, attr_name, value):
         """
         This method is used for type conversion.
-        Prodict uses this method to get the type of a value, then based on the value, it return a constructor.
-        If the type of a value is 'float' then it returns 'float' since 'float' is also a constructor to build a float
+        Prodict uses this method to get the type of a value, then based on the
+        value, it return a constructor. If the type of a value is 'float' then
+        it returns 'float' since 'float' is also a constructor to build a float
         value.
         """
         attr_type1 = self.attr_type(attr_name)
@@ -151,12 +154,12 @@ class Prodict(dict):
                     constructor = List
                     element_type = attr_type1.__args__[0]
                 elif len(attr_type1.__args__) > 1:
-                    raise TypeError('Only one dimensional List is supported, like List[str], List[int], List[Prodict]')
+                    raise TypeError('Only one dimensional List is supported')
             elif attr_type1.__dict__['__origin__'] is tuple:
                 # if the type is 'Tuple[something]'
                 constructor = tuple
 
-        # print('     constructor={} element_type={}'.format(constructor, element_type))
+        # print('constru={} element_type={}'.format(constructor, element_type))
         return constructor, element_type
 
     def set_attribute(self, attr_name, value):
@@ -168,7 +171,9 @@ class Prodict(dict):
             elif self.attr_type(attr_name) == Any:
                 self[attr_name] = value
             else:
-                constructor, element_type = self.get_constructor(attr_name, value)
+                constructor, element_type = self.get_constructor(
+                    attr_name, value
+                )
                 if constructor is None:
                     self.update({attr_name: value})
                 elif constructor == List:
@@ -200,9 +205,6 @@ class Prodict(dict):
     def set_attributes(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, **d):
         for k, v in d.items():
             self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, v)
-        """
-        'self' parameter name is changed because of #15: https://github.com/ramazanpolat/prodict/issues/15 
-        """
 
     def __getattr__(self, item):
         try:
@@ -213,10 +215,24 @@ class Prodict(dict):
     def __setattr__(self, name: str, value) -> None:
         self.set_attribute(name, value)
 
-    def to_dict(self, *args, is_recursive=False, exclude_none=False, exclude_none_in_lists=False, **kwargs):
-        ret = {k: _dict_value(v, is_recursive=is_recursive,
-                              exclude_none=exclude_none,
-                              exclude_none_in_lists=exclude_none_in_lists)
-               for k, v in self.items()
-               if _none_condition(v, is_recursive=is_recursive, exclude_none=exclude_none)}
+    def to_dict(
+        self,
+        *args,
+        is_recursive=False,
+        exclude_none=False,
+        exclude_none_in_lists=False,
+        **kwargs
+    ):
+        ret = {
+            k: _dict_value(
+                v,
+                is_recursive=is_recursive,
+                exclude_none=exclude_none,
+                exclude_none_in_lists=exclude_none_in_lists,
+            )
+            for k, v in self.items()
+            if _none_condition(
+                v, is_recursive=is_recursive, exclude_none=exclude_none
+            )
+        }
         return ret
