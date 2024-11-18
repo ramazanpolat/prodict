@@ -295,7 +295,7 @@ class TestProdict(TestCase):
         try:
             print(ram.flavor)
             assert False
-        except KeyError:
+        except AttributeError:
             pass
 
     def test_default_none(self):
@@ -309,7 +309,7 @@ class TestProdict(TestCase):
         try:
             print(honda.color)  # This also raises KeyError since it is not even defined or set.
             raise Exception("'honda.color' must raise KeyError")
-        except KeyError:
+        except AttributeError:
             print("'honda.color' raises KeyError. Ok")
 
     def test_to_dict_recursive(self):
