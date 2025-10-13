@@ -490,3 +490,240 @@ class TestProdict(TestCase):
             # print(decoded)
         except:
             assert False
+
+    def test_dict_value_all_combinations(self):
+        """
+        Test to_dict method with all 8 combinations of the original three boolean parameters:
+        is_recursive, exclude_none, exclude_none_in_lists
+
+        Expected behavior:
+        - is_recursive=True: converts nested Prodict attributes to plain dicts
+        - exclude_none=True: excludes key-value pairs where value is None
+        - exclude_none_in_lists=True: converts list items to dict AND excludes None values (legacy behavior)
+        """
+        from prodict import _dict_value
+
+        # Setup test data with nested structures and None values
+        class Product(Prodict):
+            name: str
+            price: int
+            category: str
+
+        class Store(Prodict):
+            name: str
+            product: Product
+            products: List[Product]
+            location: str
+
+        # Create test objects
+        product_with_price = Product(name='Laptop', price=1000, category='Electronics')
+        product_without_price = Product(name='Mouse', price=None, category='Electronics')
+        product_partial = Product(name='Keyboard', price=50, category=None)
+
+        store = Store(
+            name='TechStore',
+            product=product_with_price,
+            products=[product_without_price, product_partial],
+            location=None
+        )
+
+        # Test 1: Default behavior (all False)
+        # Expected: Top-level dict, nested Prodict remains, None values included, list items as Prodict
+        result1 = store.to_dict(is_recursive=False, exclude_none=False, exclude_none_in_lists=False)
+        assert isinstance(result1, dict)
+        assert isinstance(result1['product'], Product), "Nested Prodict should remain as Prodict"
+        assert isinstance(result1['products'][0], Product), "List items should remain as Prodict"
+        assert 'location' in result1, "None values should be included"
+        assert result1['location'] is None
+
+        # Test 2: is_recursive=True only
+        # Expected: Direct nested Prodict converted to dict, list items remain as Prodict
+        # Note: is_recursive only converts nested Prodict attributes, NOT items inside lists
+        result2 = store.to_dict(is_recursive=True, exclude_none=False, exclude_none_in_lists=False)
+        assert isinstance(result2, dict)
+        assert isinstance(result2['product'], dict), "is_recursive should convert nested Prodict to dict"
+        assert not isinstance(result2['product'], Prodict)
+        assert isinstance(result2['products'][0], Product), "List items remain as Prodict without convert_list_items"
+
+        # Test 3: exclude_none=True only
+        # Expected: Top-level None values excluded, nested Prodict remains, list items as Prodict
+        result3 = store.to_dict(is_recursive=False, exclude_none=True, exclude_none_in_lists=False)
+        assert isinstance(result3, dict)
+        assert 'location' not in result3, "exclude_none should exclude None values from result"
+        assert isinstance(result3['product'], Product), "Nested Prodict should remain"
+        assert isinstance(result3['products'][0], Product), "List items should remain as Prodict"
+
+        # Test 4: exclude_none_in_lists=True only (implies convert_list_items=True)
+        # Expected: Nested Prodict remains, list items converted to dict WITHOUT None values
+        result4 = store.to_dict(is_recursive=False, exclude_none=False, exclude_none_in_lists=True)
+        assert isinstance(result4, dict)
+        assert isinstance(result4['product'], Product), "Nested Prodict should remain"
+        assert isinstance(result4['products'][0], dict), "exclude_none_in_lists converts list items to dict"
+        assert 'price' not in result4['products'][0], "None values in list items should be excluded"
+        assert 'name' in result4['products'][0], "Non-None values should be present"
+        assert 'category' not in result4['products'][1], "None category should be excluded"
+
+        # Test 5: is_recursive=True, exclude_none=True
+        # Expected: Direct nested Prodict to dict, top-level None excluded, list items remain as Prodict
+        result5 = store.to_dict(is_recursive=True, exclude_none=True, exclude_none_in_lists=False)
+        assert isinstance(result5, dict)
+        assert 'location' not in result5, "Top-level None should be excluded"
+        assert isinstance(result5['product'], dict), "Nested Prodict should be dict"
+        assert isinstance(result5['products'][0], Product), "List items remain as Prodict without convert_list_items"
+
+        # Test 6: is_recursive=True, exclude_none_in_lists=True
+        # Expected: All Prodict to dict, top-level None kept, list items without None
+        result6 = store.to_dict(is_recursive=True, exclude_none=False, exclude_none_in_lists=True)
+        assert isinstance(result6, dict)
+        assert 'location' in result6, "Top-level None should be kept"
+        assert isinstance(result6['product'], dict), "Nested Prodict should be dict"
+        assert isinstance(result6['products'][0], dict), "List items should be dict"
+        assert 'price' not in result6['products'][0], "None in list items should be excluded"
+
+        # Test 7: exclude_none=True, exclude_none_in_lists=True
+        # Expected: Top-level None excluded, nested Prodict remains, list items as dict without None
+        result7 = store.to_dict(is_recursive=False, exclude_none=True, exclude_none_in_lists=True)
+        assert isinstance(result7, dict)
+        assert 'location' not in result7, "Top-level None should be excluded"
+        assert isinstance(result7['product'], Product), "Nested Prodict should remain"
+        assert isinstance(result7['products'][0], dict), "List items should be dict"
+        assert 'price' not in result7['products'][0], "None in list items should be excluded"
+
+        # Test 8: All True
+        # Expected: All Prodict to dict, all None excluded everywhere
+        result8 = store.to_dict(is_recursive=True, exclude_none=True, exclude_none_in_lists=True)
+        assert isinstance(result8, dict)
+        assert 'location' not in result8, "Top-level None should be excluded"
+        assert isinstance(result8['product'], dict), "Nested Prodict should be dict"
+        assert isinstance(result8['products'][0], dict), "List items should be dict"
+        assert 'price' not in result8['products'][0], "None in list items should be excluded"
+        assert 'category' not in result8['products'][1], "None in list items should be excluded"
+
+    def test_convert_list_items_parameter(self):
+        """
+        Test the new convert_list_items parameter that allows converting list items
+        to dict while keeping None values (unlike exclude_none_in_lists which always excludes None)
+        """
+        class Item(Prodict):
+            name: str
+            value: int
+            code: str
+
+        class Container(Prodict):
+            title: str
+            items_list: List[Item]
+
+        item1 = Item(name='A', value=10, code=None)
+        item2 = Item(name='B', value=None, code='B01')
+        item3 = Item(name='C', value=30, code='C01')
+
+        container = Container(title='TestContainer', items_list=[item1, item2, item3])
+
+        # Test 1: convert_list_items=False (default) - list items stay as Prodict
+        result1 = container.to_dict(convert_list_items=False)
+        assert isinstance(result1['items_list'][0], Item), "List items should remain as Prodict"
+        assert isinstance(result1['items_list'][1], Item)
+
+        # Test 2: convert_list_items=True, exclude_none=False - convert to dict, keep None
+        result2 = container.to_dict(convert_list_items=True, exclude_none=False)
+        assert isinstance(result2['items_list'][0], dict), "List items should be converted to dict"
+        assert not isinstance(result2['items_list'][0], Prodict)
+        assert 'code' in result2['items_list'][0], "None values should be kept"
+        assert result2['items_list'][0]['code'] is None
+        assert 'value' in result2['items_list'][1], "None values should be kept"
+        assert result2['items_list'][1]['value'] is None
+
+        # Test 3: convert_list_items=True, exclude_none=True - convert to dict, exclude None
+        result3 = container.to_dict(convert_list_items=True, exclude_none=True)
+        assert isinstance(result3['items_list'][0], dict)
+        assert 'code' not in result3['items_list'][0], "None values should be excluded from list items"
+        assert 'name' in result3['items_list'][0], "Non-None values should be present"
+        assert 'value' not in result3['items_list'][1], "None values should be excluded"
+
+        # Test 4: convert_list_items=True, is_recursive=True - everything becomes dict
+        result4 = container.to_dict(convert_list_items=True, is_recursive=True)
+        assert isinstance(result4, dict)
+        assert isinstance(result4['items_list'][0], dict)
+        assert 'code' in result4['items_list'][0], "None should be kept with exclude_none=False"
+
+        # Test 5: Verify backward compatibility - exclude_none_in_lists still works
+        result5 = container.to_dict(exclude_none_in_lists=True)
+        assert isinstance(result5['items_list'][0], dict), "exclude_none_in_lists should convert to dict"
+        assert 'code' not in result5['items_list'][0], "exclude_none_in_lists should exclude None"
+
+        # Test 6: convert_list_items with nested structures
+        class Nested(Prodict):
+            container: Container
+            count: int
+
+        nested = Nested(container=container, count=5)
+
+        result6 = nested.to_dict(is_recursive=True, convert_list_items=True, exclude_none=False)
+        assert isinstance(result6['container'], dict), "Nested Prodict should be dict"
+        assert isinstance(result6['container']['items_list'][0], dict), "List items should be dict"
+        assert 'code' in result6['container']['items_list'][0], "None should be kept"
+
+        # Test 7: Demonstrate the key difference between convert_list_items and exclude_none_in_lists
+        result_with_convert = container.to_dict(convert_list_items=True, exclude_none=False)
+        result_with_exclude = container.to_dict(exclude_none_in_lists=True)
+
+        # Both convert to dict
+        assert isinstance(result_with_convert['items_list'][0], dict)
+        assert isinstance(result_with_exclude['items_list'][0], dict)
+
+        # But convert_list_items keeps None, exclude_none_in_lists removes it
+        assert 'code' in result_with_convert['items_list'][0]
+        assert result_with_convert['items_list'][0]['code'] is None
+        assert 'code' not in result_with_exclude['items_list'][0]
+
+    def test_dict_value_edge_cases(self):
+        """
+        Test _dict_value with edge cases like None values, empty lists, nested lists
+        """
+        from prodict import _dict_value
+
+        class Thing(Prodict):
+            label: str
+            amount: int
+
+        # Test None value
+        assert _dict_value(None, False, False, False, False) is None
+        assert _dict_value(None, True, True, True, True) is None
+
+        # Test empty list
+        empty_list = []
+        assert _dict_value(empty_list, False, False, False, False) == []
+        assert _dict_value(empty_list, True, True, True, True) == []
+
+        # Test list with None values (not Prodict)
+        list_with_none = [1, None, 3]
+        result = _dict_value(list_with_none, False, False, True, False)
+        assert result == [1, None, 3], "exclude_none_in_lists only affects Prodict items"
+
+        # Test list with mixed Prodict and non-Prodict
+        thing1 = Thing(label='test', amount=None)
+        mixed_list = [thing1, 'plain_string', 42]
+        result = _dict_value(mixed_list, False, False, True, False)
+        assert isinstance(result, list)
+        assert isinstance(result[0], dict), "Prodict in list converts to dict"
+        assert 'amount' not in result[0], "None excluded from Prodict in list"
+        assert result[1] == 'plain_string'
+        assert result[2] == 42
+
+        # Test deeply nested Prodict
+        class Wrapper(Prodict):
+            thing: Thing
+            depth: int
+
+        wrapped = Wrapper(thing=Thing(label='nested', amount=100), depth=2)
+
+        # Non-recursive keeps it as Prodict
+        result_non_recursive = _dict_value(wrapped, False, False, False, False)
+        assert isinstance(result_non_recursive, Wrapper)
+
+        # Recursive converts to dict, nested Thing also converts
+        result_recursive = _dict_value(wrapped, True, False, False, False)
+        assert isinstance(result_recursive, dict)
+        assert 'thing' in result_recursive
+        # The nested thing gets converted via to_dict
+        assert isinstance(result_recursive['thing'], dict)
