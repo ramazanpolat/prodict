@@ -1,6 +1,6 @@
 from distutils.core import setup
 
-version = '0.8.20'
+version = '0.8.21'
 
 setup(
     name='prodict',
@@ -20,6 +20,6 @@ setup(
     classifiers=['Development Status :: 4 - Beta',
                  'Intended Audience :: Developers',
                  'License :: OSI Approved :: MIT License',
-                 'Programming Language :: Python :: 3.7',
+                 'Programming Language :: Python :: 3.12',
                  'Topic :: Software Development :: Libraries :: Python Modules'],
 )
