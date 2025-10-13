@@ -10,16 +10,29 @@ class GenericMeta(type):
     pass
 
 
-def _dict_value(v, is_recursive, exclude_none, exclude_none_in_lists):
+def _dict_value(v, is_recursive, exclude_none, exclude_none_in_lists, convert_list_items):
     if is_recursive and isinstance(v, Prodict):
-        return v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none)
-    if exclude_none_in_lists and isinstance(v, List):
+        return v.to_dict(is_recursive=is_recursive, exclude_none=exclude_none,
+                        exclude_none_in_lists=exclude_none_in_lists,
+                        convert_list_items=convert_list_items)
+
+    # Handle lists: convert items to dict if requested
+    if isinstance(v, List) and (convert_list_items or exclude_none_in_lists):
+        # Determine whether to exclude None from list items
+        # If exclude_none_in_lists=True, always exclude None (legacy behavior)
+        # Otherwise, respect the parent's exclude_none setting
+        list_item_exclude_none = True if exclude_none_in_lists else exclude_none
+
         return [
-            item.to_dict(exclude_none=True, is_recursive=is_recursive)
+            item.to_dict(exclude_none=list_item_exclude_none,
+                        is_recursive=is_recursive,
+                        exclude_none_in_lists=exclude_none_in_lists,
+                        convert_list_items=convert_list_items)
             if isinstance(item, Prodict)
             else item
             for item in v
         ]
+
     return v
 
 
@@ -221,14 +234,41 @@ class Prodict(dict):
         is_recursive=False,
         exclude_none=False,
         exclude_none_in_lists=False,
+        convert_list_items=False,
         **kwargs
     ):
+        """
+        Converts Prodict to dict.
+
+        :param is_recursive: If True, nested Prodict attributes are converted to dicts
+        :param exclude_none: If True, attributes with None values are excluded from the result
+        :param exclude_none_in_lists: If True, Prodict items in lists are converted to dicts
+                                      with None values excluded (legacy behavior, implies convert_list_items=True)
+        :param convert_list_items: If True, Prodict items in lists are converted to dicts
+                                   (respects exclude_none setting for those items)
+        :return: dict
+
+        Examples:
+            # Keep list items as Prodict
+            obj.to_dict()  # or to_dict(is_recursive=False, convert_list_items=False)
+
+            # Convert list items to dict, keeping None values
+            obj.to_dict(convert_list_items=True)
+
+            # Convert list items to dict, excluding None values
+            obj.to_dict(convert_list_items=True, exclude_none=True)
+            # or obj.to_dict(exclude_none_in_lists=True)  # legacy, always excludes None
+
+            # Convert everything recursively
+            obj.to_dict(is_recursive=True, convert_list_items=True)
+        """
         ret = {
             k: _dict_value(
                 v,
                 is_recursive=is_recursive,
                 exclude_none=exclude_none,
                 exclude_none_in_lists=exclude_none_in_lists,
+                convert_list_items=convert_list_items,
             )
             for k, v in self.items()
             if _none_condition(
