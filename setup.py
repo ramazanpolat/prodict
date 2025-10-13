@@ -20,6 +20,6 @@ setup(
     classifiers=['Development Status :: 4 - Beta',
                  'Intended Audience :: Developers',
                  'License :: OSI Approved :: MIT License',
-                 'Programming Language :: Python :: 3.12',
+                 'Programming Language :: Python :: 3.10',
                  'Topic :: Software Development :: Libraries :: Python Modules'],
 )
