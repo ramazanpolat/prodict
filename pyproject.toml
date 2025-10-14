@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "prodict"
-version = "0.8.20"
+version = "0.8.22"
 description = "Prodict = Pro Dictionary with IDE friendly(auto code completion), dot-accessible attributes and more."
 readme = "README.MD"
 license = {text = "MIT"}
@@ -25,12 +25,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules"
 ]
@@ -39,7 +33,7 @@ dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/ramazanpolat/prodict"
-Download = "https://pypi.python.org/pypi/prodict/0.8.20"
+Download = "https://pypi.python.org/pypi/prodict/0.8.22"
 Repository = "https://github.com/ramazanpolat/prodict"
 Issues = "https://github.com/ramazanpolat/prodict/issues"
 
