@@ -32,52 +32,73 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Unannotated dict values automatically become Prodict instances
 - `List[CustomProdict]` automatically instantiates list elements as CustomProdict objects
 
+### to_dict() Method
+
+The `to_dict()` method supports flexible serialization with four parameters:
+
+- **is_recursive**: When True, converts nested Prodict attributes to plain dicts
+- **exclude_none**: When True, excludes top-level key-value pairs where value is None
+- **exclude_none_in_lists**: When True, converts list items to dicts and excludes None values (legacy)
+- **convert_list_items**: When True, converts Prodict items in lists to dicts (respects exclude_none)
+
+**Key difference**: `convert_list_items=True` with `exclude_none=False` allows converting list items to dicts while keeping None values, which was previously impossible.
+
 ## Development Commands
 
-### Testing
+This project uses **uv** for modern Python package management.
+
+### Setup and Installation
+
 ```bash
-# Run all tests
-pytest test_prodict.py
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Run specific test
-pytest test_prodict.py::TestProdict::test_deep_recursion_from_dict
+# Install package in development mode with dev dependencies
+uv pip install -e ".[dev]"
 
-# Run with verbose output
-pytest -v test_prodict.py
+# Or install just the package
+uv pip install -e .
 ```
 
-### Linting
+### Testing
+
 ```bash
-# Install flake8
-pip install flake8
+# Run all tests
+uv run pytest test_prodict.py
 
-# Check for critical errors
-flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+# Run specific test
+uv run pytest test_prodict.py::TestProdict::test_dict_value_all_combinations
 
-# Full lint (warnings only)
-flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+# Run with verbose output
+uv run pytest -v test_prodict.py
 ```
 
 ### Building and Distribution
+
 ```bash
-# Build distribution
-python setup.py sdist
+# Build distribution packages
+uv build
 
-# Check distribution with twine
-pip install twine
-twine check dist/*
-
-# Test upload (requires credentials)
-twine upload --repository testpypi dist/*
+# Check package metadata
+uv pip show prodict
 ```
 
-### Installation
-```bash
-# Install locally for development
-pip install -e .
+### Development Workflow
 
-# Install from source
-pip install .
+```bash
+# Create a virtual environment (optional, uv manages this)
+uv venv
+
+# Activate virtual environment
+source .venv/bin/activate  # On Unix/macOS
+# or
+.venv\Scripts\activate  # On Windows
+
+# Install in editable mode
+uv pip install -e ".[dev]"
+
+# Run tests
+uv run pytest
 ```
 
 ## Testing Guidelines
@@ -92,6 +113,7 @@ pip install .
 - **test_issue15**: Ensures "self" can be used as a key name (validates UUID self parameter)
 - **test_issue18**: Verifies generator expressions work in constructor
 - **test_to_dict_exclude_none**: Tests exclude_none and exclude_none_in_lists parameters
+- **test_convert_list_items_parameter**: Tests the new convert_list_items parameter
 - **test_deepcopy1/2**: Validates copy.deepcopy() preserves type and creates new instances
 
 ## Important Implementation Details
@@ -111,12 +133,30 @@ pip install .
 - Setting a class attribute via dot notation creates a shadowing instance attribute
 - Access shadowed attributes via `.get('attr_name')` or set class attributes via ClassName.attr
 
-## Version and Compatibility
+## Package Management
+
+This project uses **uv** and follows modern Python packaging standards:
+
+- **pyproject.toml**: PEP 621 compliant project metadata and build configuration
+- **hatchling**: Build backend for creating wheels and sdists
+- No setup.py, setup.cfg, or requirements.txt (all managed via pyproject.toml)
+
+### Version and Compatibility
 
 - Current version: 0.8.20
-- Requires Python 3.7+ (uses `__annotations__`)
-- Setup uses distutils.core (setup.py) and Poetry (pyproject.toml)
+- Requires Python 3.7+
 - No runtime dependencies
+- Development dependencies: pytest>=7.0.0
+
+### Publishing
+
+```bash
+# Build the package
+uv build
+
+# Upload to PyPI (requires credentials)
+twine upload dist/*
+```
 
 ## CI/CD
 

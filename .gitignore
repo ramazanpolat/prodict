@@ -165,3 +165,17 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# uv
+uv.lock
+.python-version
+
+# Modern Python build
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+
+# pytest
+.pytest_cache/
