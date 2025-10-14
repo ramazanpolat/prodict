@@ -10,7 +10,7 @@ jobs:
     - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: 3.12
+        python-version: "3.12"
 
     - name: Install uv
       uses: astral-sh/setup-uv@v1
@@ -18,14 +18,17 @@ jobs:
     - name: Install dependencies
       run: |
         uv pip install --system '.[dev]' flake8 twine
+
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
     - name: Test with pytest
-      run: pytest
+      run: uv run pytest
+
     - name: Build and verify distribution
       run: |
         uv build
@@ -40,27 +43,22 @@ jobs:
     - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: 3.12
+        python-version: "3.12"
 
     - name: Install uv
       uses: astral-sh/setup-uv@v1
 
     - name: Install dependencies
       run: |
-        uv pip install --system '.[dev]' twine
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
-      run: pytest
+        uv pip install --system twine
+
     - name: Build distribution
       run: uv build
-    - name: Twine check
+
+    - name: Check package
       run: twine check dist/*
-    - name: Twine test upload to testpypi
+
+    - name: Upload to TestPyPI
       run: |
         sed -i 's/TESTPYPI_TOKEN/${{ secrets.TESTPYPI_TOKEN }}/' .pypirc
         sed -i 's/PYPI_TOKEN/${{ secrets.PYPI_TOKEN }}/' .pypirc
@@ -68,5 +66,6 @@ jobs:
         cp .pypirc $HOME/
         twine upload --repository testpypi dist/*
 
-    - name: Twine upload to pypi
-      run: twine upload dist/*
+    - name: Upload to PyPI
+      run: |
+        twine upload dist/*
