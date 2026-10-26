@@ -1,6 +1,9 @@
 name: CI
 
-on: [push]
+on:
+  push:
+    branches: [master]
+  pull_request:
 
 jobs:
   test:
@@ -59,7 +62,7 @@ jobs:
   deploy:
     needs: [test, build]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
     - uses: actions/checkout@v7
     - name: Set up Python 3.12

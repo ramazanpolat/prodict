@@ -80,11 +80,12 @@ annotated values.
 
 ## CI
 
-`.github/workflows/pythonapp.yml` runs on every push:
+`.github/workflows/pythonapp.yml` runs on pull requests (including from forks) and on pushes
+to `master`:
 
 - `test`: for each Python 3.8-3.15, `uv run --managed-python pytest`, then every example.
 - `build`: flake8 (errors fail, the rest is reported), `uv build`, `twine check`.
-- `deploy` (only on `master`, after both): builds, then checks PyPI for the version in
+- `deploy` (only on a push to `master`, after both): builds, then checks PyPI for the version in
   `pyproject.toml`. If it is new, uploads to TestPyPI and then PyPI with tokens from the
   `TESTPYPI_TOKEN` / `PYPI_TOKEN` secrets via `TWINE_PASSWORD`. If it exists, it stops.
 
