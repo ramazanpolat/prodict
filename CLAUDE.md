@@ -161,7 +161,7 @@ twine upload dist/*
 ## CI/CD
 
 GitHub Actions workflow (.github/workflows/pythonapp.yml):
-- Runs on every push
+- Runs on pull requests (including from forks) and on pushes to master
 - Test job: pytest on a Python 3.8-3.15 matrix (uv-managed interpreters)
 - Build job: flake8 linting, `uv build`, twine check
 - Deploy job: Runs on master branch after both. It publishes only when the `version` in pyproject.toml is not on PyPI yet, so a push without a version bump uploads nothing. Tokens come from the `TESTPYPI_TOKEN` / `PYPI_TOKEN` secrets through `TWINE_PASSWORD` and are never written to disk
