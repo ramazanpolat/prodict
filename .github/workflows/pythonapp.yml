@@ -5,6 +5,23 @@ on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install uv and Python ${{ matrix.python-version }}
+      uses: astral-sh/setup-uv@v6
+      with:
+        version: "0.13.5"
+        python-version: ${{ matrix.python-version }}
+
+    - name: Test with pytest
+      run: uv run --extra dev pytest
+
+  build:
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python 3.12
@@ -15,11 +32,11 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@v6
       with:
-        version: "0.9.2"
+        version: "0.13.5"
 
     - name: Install dependencies
       run: |
-        uv pip install --system '.[dev]' flake8 twine
+        uv pip install --system flake8 twine
 
     - name: Lint with flake8
       run: |
@@ -28,16 +45,13 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-    - name: Test with pytest
-      run: uv run pytest
-
     - name: Build and verify distribution
       run: |
         uv build
         twine check dist/*
 
   deploy:
-    needs: test
+    needs: [test, build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
     steps:
@@ -50,7 +64,7 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@v6
       with:
-        version: "0.9.2"
+        version: "0.13.5"
 
     - name: Install dependencies
       run: |
@@ -62,14 +76,15 @@ jobs:
     - name: Check package
       run: twine check dist/*
 
+    # --skip-existing: a push to master without a version bump is a no-op, not a failed upload
     - name: Upload to TestPyPI
-      run: |
-        sed -i 's/TESTPYPI_TOKEN/${{ secrets.TESTPYPI_TOKEN }}/' .pypirc
-        sed -i 's/PYPI_TOKEN/${{ secrets.PYPI_TOKEN }}/' .pypirc
-        cat .pypirc
-        cp .pypirc $HOME/
-        twine upload --repository testpypi dist/*
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
+      run: twine upload --skip-existing --repository-url https://test.pypi.org/legacy/ dist/*
 
     - name: Upload to PyPI
-      run: |
-        twine upload dist/*
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      run: twine upload --skip-existing dist/*

@@ -143,8 +143,8 @@ This project uses **uv** and follows modern Python packaging standards:
 
 ### Version and Compatibility
 
-- Current version: 0.8.20
-- Requires Python 3.7+
+- Current version: 0.8.22
+- Requires Python 3.7+ (CI tests 3.8 through 3.15; uv has no 3.7 builds)
 - No runtime dependencies
 - Development dependencies: pytest>=7.0.0
 
@@ -162,5 +162,7 @@ twine upload dist/*
 
 GitHub Actions workflow (.github/workflows/pythonapp.yml):
 - Runs on every push
-- Test job: flake8 linting, pytest, twine check
-- Deploy job: Runs on master branch, uploads to TestPyPI and PyPI (requires secrets)
+- Test job: pytest on a Python 3.8-3.15 matrix (uv-managed interpreters)
+- Build job: flake8 linting, `uv build`, twine check
+- Deploy job: Runs on master branch after both, uploads to TestPyPI and PyPI with `--skip-existing`; tokens come from the `TESTPYPI_TOKEN` / `PYPI_TOKEN` secrets via `TWINE_PASSWORD`, so a push without a version bump uploads nothing
+- Adding a Python version: add it to the workflow matrix and to the `classifiers` in pyproject.toml together
