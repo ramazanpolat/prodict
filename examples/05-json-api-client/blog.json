@@ -1,0 +1,26 @@
+{
+  "user_id": "1",
+  "user_name": "rambo",
+  "email": null,
+  "posts": [
+    {
+      "title": "Hello World",
+      "text": "This is my first blog post...",
+      "date": "2018-01-02 03:04:05",
+      "likes": "12",
+      "comments": [
+        {"user_id": "2", "comment": "Good to see you blogging", "date": "2018-01-02 03:04:06"},
+        {"user_id": 3, "comment": "Good for you", "date": "2018-01-02 03:04:07"}
+      ]
+    },
+    {
+      "title": "Leave the old behind",
+      "text": "Stop using Python 2.x...",
+      "date": "2018-02-03 04:05:06",
+      "likes": 30,
+      "comments": [
+        {"user_id": 4, "comment": "Python 2 is dead, long live Python", "date": "2018-02-03 04:05:07"}
+      ]
+    }
+  ]
+}
