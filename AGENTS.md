@@ -7,9 +7,8 @@ is, how to install and run it, how it is tested, and how it is released.
 
 `prodict` is a single-module Python library: `Prodict`, a `dict` subclass whose keys are
 also attributes, with type conversion driven by class annotations. It has no runtime
-dependencies. `requires-python` is `>=3.7`; CI tests 3.8 through 3.15 (uv has no 3.7
-interpreters). Building from source needs Python 3.8+ (`hatchling>=1.27`); on 3.7, pip
-installs the universal wheel.
+dependencies. `requires-python` is `>=3.8`; CI tests 3.8 through 3.15. On Python 3.7,
+pip resolves to 0.8.22, the last version that declares 3.7 support.
 
 | Path | What |
 |---|---|

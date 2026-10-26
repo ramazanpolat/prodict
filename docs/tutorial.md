@@ -12,7 +12,8 @@ pip install prodict
 uv add prodict
 ```
 
-Prodict has no dependencies. It is tested on Python 3.8 through 3.15.
+Prodict has no dependencies. It requires Python 3.8 or later and is tested on 3.8
+through 3.15.
 
 ## 2. A dict with attributes
 

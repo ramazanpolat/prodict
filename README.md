@@ -40,7 +40,7 @@ pip install prodict
 uv add prodict
 ```
 
-No dependencies. Tested on Python 3.8 through 3.15.
+No dependencies. Requires Python 3.8 or later; tested on 3.8 through 3.15.
 
 ## Features
 

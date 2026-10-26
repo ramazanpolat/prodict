@@ -29,6 +29,9 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 
 ### Removed
 
+- Python 3.7 support: `requires-python` is now `>=3.8`. 3.7 was never tested in CI, and
+  building from source already needed Python 3.8. pip on Python 3.7 keeps resolving to
+  0.8.22, which has the same library code.
 - Leftovers of the old setuptools build: `MANIFEST`, `MANIFEST.in`, `README.txt`, `.pypirc`.
 - `examples.py`, replaced by `examples/`.
 
