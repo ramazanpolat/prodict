@@ -6,6 +6,11 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 
 ## [Unreleased]
 
+## [0.8.23] - 2026-10-27
+
+The library code is unchanged from 0.8.22. This release publishes corrected package
+metadata (supported Python versions, license, project links) and the new README to PyPI.
+
 ### Added
 
 - Documentation in `docs/`: a tutorial and guides for typed models, serialization,
@@ -78,7 +83,8 @@ Versions 0.7 to 0.8.18 (2018 to 2021) are listed in the
 [PyPI release history](https://pypi.org/project/prodict/#history). Earlier versions exist
 only as git tags (`v0.1` to `v0.6`).
 
-[Unreleased]: https://github.com/ramazanpolat/prodict/compare/8df2632...HEAD
+[Unreleased]: https://github.com/ramazanpolat/prodict/compare/v0.8.23...HEAD
+[0.8.23]: https://pypi.org/project/prodict/0.8.23/
 [0.8.22]: https://pypi.org/project/prodict/0.8.22/
 [0.8.21]: https://pypi.org/project/prodict/0.8.21/
 [0.8.20]: https://pypi.org/project/prodict/0.8.20/
