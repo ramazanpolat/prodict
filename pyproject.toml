@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "prodict"
-version = "0.8.22"
+version = "0.8.23"
 description = "A dict with dot-accessible attributes, IDE auto-completion and type conversion driven by annotations."
 readme = "README.md"
 license = "MIT"
