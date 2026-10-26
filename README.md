@@ -102,7 +102,7 @@ computer.total_ram()    # 16
 ```
 
 **Defaults with `init()`.** Override `init()`, not `__init__`; no `super()` call needed,
-and constructor arguments win over defaults.
+and keyword arguments win over defaults.
 
 ```python
 class Settings(Prodict):
@@ -202,14 +202,20 @@ including writing the data back out, is [examples/05-json-api-client](https://gi
 
 ## Limitations
 
-- Names of `dict` methods (`items`, `keys`, `get`, ...) cannot be attributes, and names of
-  Prodict methods (`to_dict`, `from_dict`, `init`, ...) should not be.
+- Names of `dict` methods (`items`, `keys`, `get`, ...) cannot be attributes. Names of
+  Prodict methods (`to_dict`, `from_dict`, `init`, ...) can be stored but are only readable
+  with brackets, so avoid them.
 - Keys that are not valid Python identifiers (`'1'`, `'first-name'`) work with brackets and
   `set_attribute()`, not with dots.
-- Values are converted for `int`, `float`, `str`, `list`, `List[T]`, `dict` and Prodict
-  subclasses. `bool`, `tuple` and other types are stored as they come.
-- `Optional[...]`, `Union[...]` and `Dict[K, V]` annotations are not supported; use `Any`
-  or `dict`.
+- Values are converted for `int`, `float`, `str`, `list`, `List[T]`, `Tuple[...]`,
+  `Prodict` and its subclasses, when set as keyword arguments, through `from_dict()` or by
+  attribute assignment. `bool`, plain `tuple` and other types are stored as they come, and
+  so is anything set with `p['key'] = ...` or `update()`.
+- Pass data as keyword arguments or through `from_dict()`. A dict passed positionally
+  (`Model({...})`) loses the values of annotated attributes.
+- `Optional[...]`, `Union[...]`, `Dict[K, V]`, a bare `dict`, and built-in generics such
+  as `list[int]` are not supported as annotations; use `Any`, `Prodict` or the `typing`
+  forms (`List[int]`).
 - Prodict keeps data in the dict, not in instance attributes, so avoid giving class
   attributes values meant for instances.
 

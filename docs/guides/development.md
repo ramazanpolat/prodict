@@ -12,13 +12,17 @@ cd prodict
 uv run pytest
 ```
 
-Without uv, any virtual environment works (pip 25.1 or newer for `--group`):
+Without uv, use a virtual environment. On Python 3.9 and later, pip 25.1 or newer reads
+the `dev` dependency group:
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -e . --group dev
 pytest
 ```
+
+pip dropped Python 3.8 before it learned `--group`, so on 3.8 install pytest directly:
+`pip install -e . 'pytest>=7'`.
 
 ## Layout
 

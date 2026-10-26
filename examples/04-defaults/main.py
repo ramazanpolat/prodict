@@ -10,7 +10,7 @@ class Settings(Prodict):
     tags: List[str]
 
     def init(self):
-        # Runs before the constructor arguments are applied, so arguments win.
+        # Runs before the keyword arguments are applied, so they win.
         self.retries = 3
         self.timeout = 10.0
         self.tags = []

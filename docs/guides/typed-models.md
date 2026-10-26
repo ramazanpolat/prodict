@@ -29,7 +29,9 @@ Every annotated attribute exists from the start, with the value `None` until you
 
 ## What is converted
 
-Conversion happens on construction, in `from_dict()`, and on every later assignment.
+Conversion happens when a value goes through Prodict: keyword arguments to the
+constructor, `from_dict()`, attribute assignment (`p.price = ...`) and `set_attribute()`.
+Plain dict operations, `p['price'] = ...` and `p.update(...)`, store the value as it is.
 
 | Annotation | Conversion | Example input | Stored value |
 |---|---|---|---|
@@ -37,10 +39,11 @@ Conversion happens on construction, in `from_dict()`, and on every later assignm
 | `float` | `float(value)` | `'9.5'` | `9.5` |
 | `str` | `str(value)` | `42` | `'42'` |
 | `list` | `list(value)` | `('a', 'b')` | `['a', 'b']` |
+| `Tuple[...]` | `tuple(value)` | `[1, 2]` | `(1, 2)` |
 | `List[T]` | each item through `T` | `['1', '2']` with `List[int]` | `[1, 2]` |
 | a Prodict subclass | `Model.from_dict(value)` | `{'id': '1'}` | a `Model` instance |
 | `List[Model]` | each item through `Model.from_dict` | `[{'id': '1'}]` | a list of `Model` |
-| `dict` | `Prodict.from_dict(value)` | `{'a': 1}` | a `Prodict` |
+| `Prodict` | `Prodict.from_dict(value)` | `{'a': 1}` | a `Prodict` |
 | `Any` | none | anything | unchanged |
 
 ```python
@@ -50,6 +53,9 @@ Conversion happens on construction, in `from_dict()`, and on every later assignm
 >>> p.stock = '41'
 >>> p.stock
 41
+>>> p['stock'] = '40'
+>>> p.stock
+'40'
 
 ```
 
@@ -67,8 +73,9 @@ ValueError: invalid literal for int() with base 10: 'many'
 
 ## What is not converted
 
-- **`bool`, `tuple`, `set`** and other types not in the table are stored as they come.
-  `bool` is deliberately left alone, since `bool('false')` would be `True`.
+- **`bool`, plain `tuple`, `set`** and other types not in the table are stored as they
+  come. `bool` is deliberately left alone, since `bool('false')` would be `True`. (A
+  Prodict value given to such an attribute raises `AttributeError`.)
 - **Items added to a list later** (`model.items_list.append({...})`) are not converted.
   Append model instances yourself.
 
@@ -84,11 +91,17 @@ ValueError: invalid literal for int() with base 10: 'many'
 
 ## Unsupported annotations
 
-- **`Optional[...]` and `Union[...]`**: values are stored unconverted on Python 3.13 and
-  earlier, and setting a non-`None` value raises `AttributeError` on Python 3.14 and later.
-  Annotate such attributes with `Any`.
-- **`Dict[K, V]`**: setting a dict value raises `TypeError`. Annotate with `dict` or with
+- **`Optional[...]` and `Union[...]`**: depending on the value and the Python version, a
+  value is stored unconverted or raises an error (a dict raises `TypeError` and a Prodict
+  raises `AttributeError` everywhere; on Python 3.14 and later any non-`None` value raises
+  `AttributeError`). Annotate such attributes with `Any`.
+- **`Dict[K, V]`**: setting a dict value raises `TypeError`. Annotate with `Prodict` or
   a Prodict subclass instead.
+- **`dict`**: a plain dict is converted to a `Prodict`, but assigning a Prodict value
+  raises `AttributeError`, and so does `copy.deepcopy()` of the model once the attribute
+  holds a value. Annotate with `Prodict` instead.
+- **Built-in generics** (`list[int]`, `tuple[int, ...]`, `dict[str, int]`): raise an error
+  (`KeyError` or `TypeError`) for most values. Use the `typing` forms (`List[int]`, `Tuple[int, ...]`).
 
 ## Unannotated keys
 
@@ -102,10 +115,27 @@ except that dicts become `Prodict` instances:
 
 ```
 
+## Passing data in
+
+Give a model its data as keyword arguments or through `from_dict()`. A dict passed
+positionally is stored by `dict` itself, and the annotated attributes are then reset to
+`None`, so their values are lost:
+
+```python
+>>> class Point(Prodict):
+...     x: int
+
+>>> Point(x='1'), Point.from_dict({'x': '1'})
+({'x': 1}, {'x': 1})
+>>> Point({'x': '1'})
+{'x': None}
+
+```
+
 ## Default values
 
-Override `init()` to set defaults. It runs inside the constructor before the arguments
-are applied, so arguments win:
+Override `init()` to set defaults. It runs inside the constructor before the keyword
+arguments are applied, so keyword arguments win:
 
 ```python
 >>> class Settings(Prodict):
@@ -128,7 +158,8 @@ are applied, so arguments win:
 - **Names of `dict` methods** (`items`, `keys`, `values`, `get`, `update`, `copy`, ...)
   cannot be attributes. Setting one raises `TypeError`.
 - **Names of Prodict methods** (`to_dict`, `from_dict`, `init`, `set_attribute`, ...)
-  would shadow the method. Avoid them.
+  can be set, but reading them with a dot still returns the method; only `p['to_dict']`
+  reaches the value. Avoid them.
 - **Keys that are not valid identifiers** (`'1'`, `'first-name'`) cannot be reached with a
   dot, but still work with brackets or `set_attribute()`:
 

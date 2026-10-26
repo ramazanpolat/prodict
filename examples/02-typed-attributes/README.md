@@ -9,7 +9,7 @@ What it shows:
 - conversion also runs on later assignments;
 - annotated attributes that were not given exist with the value `None`;
 - `Any` turns conversion off while keeping completion;
-- keys without an annotation are stored as they are.
+- keys without an annotation are stored as they are, except that dicts become Prodicts.
 
 See [the typed models guide](../../docs/guides/typed-models.md) for exactly which types are converted.
 

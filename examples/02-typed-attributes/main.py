@@ -28,7 +28,7 @@ turkey = Country(name='Turkey')
 print(turkey)  # {'name': 'Turkey', 'population': None, 'area_km2': None, 'raw': None}
 assert turkey.population is None
 
-# Keys without an annotation are kept as they are.
+# Keys without an annotation are kept as they are (dicts would become Prodicts).
 germany.flag_colors = ['black', 'red', 'gold']
 assert germany.flag_colors == ['black', 'red', 'gold']
 

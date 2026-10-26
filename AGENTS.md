@@ -8,7 +8,8 @@ is, how to install and run it, how it is tested, and how it is released.
 `prodict` is a single-module Python library: `Prodict`, a `dict` subclass whose keys are
 also attributes, with type conversion driven by class annotations. It has no runtime
 dependencies. `requires-python` is `>=3.7`; CI tests 3.8 through 3.15 (uv has no 3.7
-interpreters).
+interpreters). Building from source needs Python 3.8+ (`hatchling>=1.27`); on 3.7, pip
+installs the universal wheel.
 
 | Path | What |
 |---|---|
@@ -32,7 +33,8 @@ uvx flake8 . --select=E9,F63,F7,F82                  # the lint CI enforces
 uv build && uvx twine check dist/*                   # sdist + wheel
 ```
 
-Without uv: `pip install -e . --group dev` (pip 25.1+), then `pytest`.
+Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
+`pip install -e . 'pytest>=7'`), then `pytest`.
 
 ## Rules for changes
 
@@ -47,15 +49,20 @@ Without uv: `pip install -e . --group dev` (pip 25.1+), then `pytest`.
 
 ## How the library works
 
-- `Prodict.__init__` calls `dict.__init__` with the arguments, sets every annotated
+- `Prodict.__init__` calls `dict.__init__` with all arguments, sets every annotated
   attribute to `None`, calls the `init()` hook (where subclasses set defaults), then
-  applies the arguments again through `set_attributes()`, which converts them.
+  applies the keyword arguments again through `set_attributes()`, which converts them.
+  Values for annotated keys passed in a positional dict are therefore lost (reset to
+  `None`); `from_dict()` passes keywords and is not affected.
 - `__getattr__` / `__setattr__` map attributes to keys. A missing key raises
   `AttributeError`.
 - `set_attribute()` converts values for annotated attributes via `get_constructor()`:
-  `int`, `float`, `str`, `list`, `List[T]` (item-wise), `dict` (to `Prodict`), Prodict
-  subclasses (`from_dict`), and `Any` (no conversion). `bool`, `tuple` and other types are
-  stored unconverted. `None` is never converted.
+  `int`, `float`, `str`, `list`, `List[T]` (item-wise), `Tuple[...]` (to `tuple`),
+  `Prodict` and its subclasses (`from_dict`), and `Any` (no conversion). A bare `dict`
+  annotation converts plain dicts but raises `AttributeError` for Prodict values and in
+  `copy.deepcopy`, because `get_constructor()` checks `isinstance(value, Prodict)` first. `bool`,
+  plain `tuple` and other types are stored unconverted. `None` is never converted.
+  `p['key'] = ...` and `update()` are plain dict operations and bypass conversion.
 - Unannotated dict values become `Prodict` instances.
 - Names of `dict` methods (`DICT_RESERVED_KEYS`) cannot be set as attributes (`TypeError`).
 - `__init__` and `set_attributes` name their first parameter
@@ -65,8 +72,11 @@ Without uv: `pip install -e . --group dev` (pip 25.1+), then `pytest`.
   `exclude_none_in_lists` (legacy). See `docs/guides/serialization.md`.
 
 Known limitations, documented in `docs/guides/typed-models.md`: `Optional`/`Union`
-annotations are unsupported (unconverted up to 3.13, `AttributeError` on 3.14+ when a
-non-`None` value is set) and `Dict[K, V]` raises `TypeError` for dict values.
+annotations are unsupported (unconverted or an error, depending on value and Python
+version; any non-`None` value raises `AttributeError` on 3.14+), `Dict[K, V]` raises
+`TypeError` for dict values, a bare `dict` annotation breaks on Prodict values and
+`deepcopy`, built-in generics (`list[int]`) raise `KeyError`, and positional dicts lose
+annotated values.
 
 ## CI
 
