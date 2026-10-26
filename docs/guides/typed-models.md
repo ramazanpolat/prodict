@@ -93,13 +93,13 @@ ValueError: invalid literal for int() with base 10: 'many'
 
 - **`Optional[...]` and `Union[...]`**: depending on the value and the Python version, a
   value is stored unconverted or raises an error (a dict raises `TypeError` and a Prodict
-  raises `AttributeError` everywhere; on Python 3.14 and later any non-`None` value raises
-  `AttributeError`). Annotate such attributes with `Any`.
+  raises `AttributeError` everywhere; on Python 3.14 and later other non-`None` values raise
+  `AttributeError` too). Annotate such attributes with `Any`.
 - **`Dict[K, V]`**: setting a dict value raises `TypeError`. Annotate with `Prodict` or
   a Prodict subclass instead.
 - **`dict`**: a plain dict is converted to a `Prodict`, but assigning a Prodict value
-  raises `AttributeError`, and so does `copy.deepcopy()` of the model once the attribute
-  holds a value. Annotate with `Prodict` instead.
+  raises `AttributeError`, and so does `copy.deepcopy()` of the model while the attribute
+  holds a Prodict (which every plain dict assigned to it becomes). Annotate with `Prodict` instead.
 - **Built-in generics** (`list[int]`, `tuple[int, ...]`, `dict[str, int]`): raise an error
   (`KeyError` or `TypeError`) for most values. Use the `typing` forms (`List[int]`, `Tuple[int, ...]`).
 

@@ -61,7 +61,8 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   `Prodict` and its subclasses (`from_dict`), and `Any` (no conversion). A bare `dict`
   annotation converts plain dicts but raises `AttributeError` for Prodict values and in
   `copy.deepcopy`, because `get_constructor()` checks `isinstance(value, Prodict)` first. `bool`,
-  plain `tuple` and other types are stored unconverted. `None` is never converted.
+  plain `tuple` and other types are stored unconverted (a Prodict value raises
+  `AttributeError`). `None` is never converted.
   `p['key'] = ...` and `update()` are plain dict operations and bypass conversion.
 - Unannotated dict values become `Prodict` instances.
 - Names of `dict` methods (`DICT_RESERVED_KEYS`) cannot be set as attributes (`TypeError`).
@@ -73,9 +74,10 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
 
 Known limitations, documented in `docs/guides/typed-models.md`: `Optional`/`Union`
 annotations are unsupported (unconverted or an error, depending on value and Python
-version; any non-`None` value raises `AttributeError` on 3.14+), `Dict[K, V]` raises
+version; on 3.14+ every non-`None` value fails), `Dict[K, V]` raises
 `TypeError` for dict values, a bare `dict` annotation breaks on Prodict values and
-`deepcopy`, built-in generics (`list[int]`) raise `KeyError`, and positional dicts lose
+`deepcopy`, built-in generics (`list[int]`) fail for most values (`KeyError`, `TypeError`
+or `AttributeError` depending on the value), and positional dicts lose
 annotated values.
 
 ## CI
