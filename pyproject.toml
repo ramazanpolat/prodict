@@ -1,30 +1,33 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
 name = "prodict"
 version = "0.8.22"
-description = "Prodict = Pro Dictionary with IDE friendly(auto code completion), dot-accessible attributes and more."
-readme = "README.MD"
-license = {text = "MIT"}
+description = "A dict with dot-accessible attributes, IDE auto-completion and type conversion driven by annotations."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE.txt"]
 authors = [
     {name = "Ramazan Polat", email = "ramazanpolat@gmail.com"}
 ]
 keywords = [
     "prodict",
-    "python3",
-    "typehinting",
-    "dynamic-props",
     "dict",
     "dictionary",
+    "attribute-access",
+    "dot-notation",
+    "type-hints",
+    "typehinting",
     "auto-complete",
-    "auto-code-complete"
+    "json",
+    "dynamic-props"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.8",
@@ -42,14 +45,19 @@ dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/ramazanpolat/prodict"
-Download = "https://pypi.python.org/pypi/prodict/0.8.22"
+Documentation = "https://github.com/ramazanpolat/prodict/tree/master/docs"
 Repository = "https://github.com/ramazanpolat/prodict"
 Issues = "https://github.com/ramazanpolat/prodict/issues"
+Changelog = "https://github.com/ramazanpolat/prodict/blob/master/CHANGELOG.md"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=7.0.0"
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["test_prodict.py", "docs"]
+addopts = ["--doctest-glob=*.md"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["prodict"]
@@ -58,7 +66,8 @@ packages = ["prodict"]
 include = [
     "/prodict",
     "/test_prodict.py",
-    "/examples.py",
-    "/README.MD",
-    "/LICENSE.txt"
+    "/docs",
+    "/examples",
+    "/README.md",
+    "/CHANGELOG.md"
 ]

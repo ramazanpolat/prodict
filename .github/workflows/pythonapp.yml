@@ -1,4 +1,4 @@
-name: Python application
+name: CI
 
 on: [push]
 
@@ -17,8 +17,14 @@ jobs:
         version: "0.13.5"
         python-version: ${{ matrix.python-version }}
 
-    - name: Test with pytest
-      run: uv run --managed-python --extra dev pytest
+    - name: Test with pytest (unit tests and the doctests in docs/)
+      run: uv run --managed-python pytest
+
+    - name: Run the examples
+      run: |
+        for example in examples/*/main.py; do
+          uv run --managed-python python "$example"
+        done
 
   build:
     runs-on: ubuntu-latest
