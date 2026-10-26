@@ -64,13 +64,13 @@ uv pip install -e .
 
 ```bash
 # Run all tests
-uv run pytest test_prodict.py
+uv run --extra dev pytest test_prodict.py
 
 # Run specific test
-uv run pytest test_prodict.py::TestProdict::test_dict_value_all_combinations
+uv run --extra dev pytest test_prodict.py::TestProdict::test_dict_value_all_combinations
 
 # Run with verbose output
-uv run pytest -v test_prodict.py
+uv run --extra dev pytest -v test_prodict.py
 ```
 
 ### Building and Distribution
@@ -98,7 +98,7 @@ source .venv/bin/activate  # On Unix/macOS
 uv pip install -e ".[dev]"
 
 # Run tests
-uv run pytest
+uv run --extra dev pytest
 ```
 
 ## Testing Guidelines
@@ -164,5 +164,5 @@ GitHub Actions workflow (.github/workflows/pythonapp.yml):
 - Runs on every push
 - Test job: pytest on a Python 3.8-3.15 matrix (uv-managed interpreters)
 - Build job: flake8 linting, `uv build`, twine check
-- Deploy job: Runs on master branch after both, uploads to TestPyPI and PyPI with `--skip-existing`; tokens come from the `TESTPYPI_TOKEN` / `PYPI_TOKEN` secrets via `TWINE_PASSWORD`, so a push without a version bump uploads nothing
+- Deploy job: Runs on master branch after both. It publishes only when the `version` in pyproject.toml is not on PyPI yet, so a push without a version bump uploads nothing. Tokens come from the `TESTPYPI_TOKEN` / `PYPI_TOKEN` secrets through `TWINE_PASSWORD` and are never written to disk
 - Adding a Python version: add it to the workflow matrix and to the `classifiers` in pyproject.toml together

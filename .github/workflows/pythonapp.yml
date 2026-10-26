@@ -18,7 +18,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Test with pytest
-      run: uv run --extra dev pytest
+      run: uv run --managed-python --extra dev pytest
 
   build:
     runs-on: ubuntu-latest
@@ -76,15 +76,34 @@ jobs:
     - name: Check package
       run: twine check dist/*
 
-    # --skip-existing: a push to master without a version bump is a no-op, not a failed upload
+    # Publish only when pyproject.toml carries a version PyPI does not have yet, so a push
+    # to master without a version bump publishes nothing and never re-uses an old version.
+    - name: Check whether this version is already on PyPI
+      id: pypi
+      run: |
+        version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+        status=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/prodict/$version/json")
+        case "$status" in
+          200) echo "prodict $version is already on PyPI; nothing to publish"
+               echo "publish=false" >> "$GITHUB_OUTPUT" ;;
+          404) echo "prodict $version is new; publishing"
+               echo "publish=true" >> "$GITHUB_OUTPUT" ;;
+          *)   echo "Unexpected PyPI response $status for prodict $version"
+               exit 1 ;;
+        esac
+
+    # --skip-existing only here: TestPyPI may already hold this version from an earlier,
+    # interrupted run of the same release.
     - name: Upload to TestPyPI
+      if: steps.pypi.outputs.publish == 'true'
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
       run: twine upload --skip-existing --repository-url https://test.pypi.org/legacy/ dist/*
 
     - name: Upload to PyPI
+      if: steps.pypi.outputs.publish == 'true'
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-      run: twine upload --skip-existing dist/*
+      run: twine upload dist/*
