@@ -13,11 +13,15 @@ Releases are published by CI. Merging to `master` publishes to PyPI exactly when
    - builds the sdist and wheel and runs `twine check`;
    - asks PyPI whether the version exists, and stops here if it does;
    - uploads to TestPyPI, then to PyPI.
-5. Once the version is on PyPI, tag the release commit, push the tag and create a
-   GitHub release from the changelog section (recommended; CI does not need either):
+5. Once the version is on PyPI, tag the `master` commit the `deploy` job built, push the
+   tag and create a GitHub release from the changelog section (recommended; CI does not
+   need either). Name the commit explicitly, so the tag cannot land on a local branch:
 
    ```bash
-   git tag -a v0.8.23 -m "prodict 0.8.23" && git push origin v0.8.23
+   gh run list --workflow pythonapp.yml --branch master --limit 1 --json headSha
+   git fetch origin
+   git tag -a v0.8.23 <deployed-sha> -m "prodict 0.8.23"
+   git push origin v0.8.23
    gh release create v0.8.23 --title "prodict 0.8.23" --notes-file notes.md
    ```
 
