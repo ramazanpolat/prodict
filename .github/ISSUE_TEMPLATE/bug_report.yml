@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in prodict does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [known limitations](https://github.com/ramazanpolat/prodict#limitations) first. Unsupported annotations such as `Optional[...]` and `list[int]` are listed there, with workarounds.
+  - type: input
+    id: prodict-version
+    attributes:
+      label: prodict version
+      description: Shown by `pip show prodict`.
+      placeholder: 0.8.23
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: 3.12.4
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Minimal example
+      description: The smallest snippet that shows the problem.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happens
+      description: The output, or the full traceback.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true

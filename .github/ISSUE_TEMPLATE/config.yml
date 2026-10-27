@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/ramazanpolat/prodict/tree/master/docs
+    about: Tutorial and guides for typed models, serialization and development.
+  - name: Security vulnerability
+    url: https://github.com/ramazanpolat/prodict/security/advisories/new
+    about: Report it privately, not as an issue. See SECURITY.md.

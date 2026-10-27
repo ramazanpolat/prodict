@@ -4,9 +4,12 @@ Thanks for helping. Bug reports, documentation fixes and pull requests are all w
 
 ## Reporting a bug
 
-Open an [issue](https://github.com/ramazanpolat/prodict/issues) with the Python version,
-the prodict version (`pip show prodict`), a minimal snippet that reproduces the problem,
-and what you expected instead.
+Open an issue with the
+[bug report form](https://github.com/ramazanpolat/prodict/issues/new?template=bug_report.yml).
+It asks for the Python version, the prodict version (`pip show prodict`), a minimal snippet
+that reproduces the problem, and what you expected instead.
+
+Security problems go through private reporting instead; see [SECURITY.md](SECURITY.md).
 
 ## Making a change
 
