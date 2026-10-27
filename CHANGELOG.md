@@ -6,6 +6,11 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 
 ## [Unreleased]
 
+### Added
+
+- Issue forms for bug reports and feature requests, a pull request template, and
+  `SECURITY.md`, which points to GitHub's private vulnerability reporting.
+
 ## [0.8.23] - 2026-10-27
 
 The library code is unchanged from 0.8.22. This release publishes corrected package
