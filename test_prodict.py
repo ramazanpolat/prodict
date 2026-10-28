@@ -1,6 +1,6 @@
 import pickle
 from unittest import TestCase
-from typing import List, Any, Tuple
+from typing import List, Any, Tuple, Dict
 import unittest
 from datetime import datetime
 from prodict import Prodict
@@ -727,3 +727,50 @@ class TestProdict(TestCase):
         assert 'thing' in result_recursive
         # The nested thing gets converted via to_dict
         assert isinstance(result_recursive['thing'], dict)
+
+    def test_prodict_value_for_dict_bool_tuple_annotations(self):
+        # #56: a Prodict assigned to a dict, bool or tuple attribute is stored
+        class M(Prodict):
+            d: dict
+            ok: bool
+            pair: tuple
+            nums: List[int]
+
+        inner = Prodict(a=1)
+        m = M(d=inner, ok=Prodict(a=1), pair=Prodict(a=1), nums=Prodict(a=1))
+        self.assertIs(m.d, inner)
+        self.assertEqual(m.ok, {'a': 1})
+        self.assertEqual(m.pair, {'a': 1})
+        self.assertEqual(m.nums, {'a': 1})
+
+        # a plain dict for a dict attribute still becomes a Prodict
+        self.assertIsInstance(M(d={'a': 1}).d, Prodict)
+
+        # deepcopy re-assigns every value, including the Prodict in d
+        m2 = M(d={'a': {'b': 2}})
+        clone = copy.deepcopy(m2)
+        self.assertEqual(clone, m2)
+        self.assertIsInstance(clone, M)
+        self.assertIsInstance(clone.d, Prodict)
+        self.assertIsNot(clone.d, m2.d)
+
+        # a Prodict subclass value keeps its class in a dict attribute
+        ram = Ram(capacity=4)
+        self.assertIs(M(d=ram).d, ram)
+
+    def test_typing_dict_annotation(self):
+        # #57: Dict[K, V] and bare Dict accept dict values like dict does
+        class M(Prodict):
+            d: Dict[str, int]
+            bare: Dict
+
+        m = M(d={'a': 1}, bare={'b': {'c': 2}})
+        self.assertEqual(m, {'d': {'a': 1}, 'bare': {'b': {'c': 2}}})
+        self.assertIsInstance(m.d, Prodict)
+        self.assertEqual(m.d.a, 1)
+        self.assertIsInstance(m.bare, Prodict)
+        self.assertEqual(M(), {'d': None, 'bare': None})
+        self.assertEqual(copy.deepcopy(m), m)
+
+        m.d = Prodict(x=1)
+        self.assertEqual(m.d, {'x': 1})

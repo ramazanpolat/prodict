@@ -74,8 +74,8 @@ ValueError: invalid literal for int() with base 10: 'many'
 ## What is not converted
 
 - **`bool`, plain `tuple`, `set`** and other types not in the table are stored as they
-  come. `bool` is deliberately left alone, since `bool('false')` would be `True`. (A
-  Prodict value given to such an attribute raises `AttributeError`.)
+  come, Prodict values included. `bool` is deliberately left alone, since
+  `bool('false')` would be `True`.
 - **Items added to a list later** (`model.items_list.append({...})`) are not converted.
   Append model instances yourself.
 
@@ -92,14 +92,12 @@ ValueError: invalid literal for int() with base 10: 'many'
 ## Unsupported annotations
 
 - **`Optional[...]` and `Union[...]`**: depending on the value and the Python version, a
-  value is stored unconverted or raises an error (a dict raises `TypeError` and a Prodict
-  raises `AttributeError` everywhere; on Python 3.14 and later other non-`None` values raise
-  `AttributeError` too). Annotate such attributes with `Any`.
-- **`Dict[K, V]`**: setting a dict value raises `TypeError`. Annotate with `Prodict` or
-  a Prodict subclass instead.
-- **`dict`**: a plain dict is converted to a `Prodict`, but assigning a Prodict value
-  raises `AttributeError`, and so does `copy.deepcopy()` of the model while the attribute
-  holds a Prodict (which every plain dict assigned to it becomes). Annotate with `Prodict` instead.
+  value is stored unconverted or raises an error (dicts and Prodicts are stored
+  unconverted; on Python 3.14 and later other non-`None` values raise `AttributeError`).
+  Annotate such attributes with `Any`.
+- **`dict` and `Dict[K, V]`**: a plain dict is converted to a `Prodict` and a Prodict is
+  stored as it is, but the keys and values are not converted to `K` and `V`. Annotate with
+  a Prodict subclass to get converted values.
 - **Built-in generics** (`list[int]`, `tuple[int, ...]`, `dict[str, int]`): raise an error
   (`KeyError` or `TypeError`) for most values. Use the `typing` forms (`List[int]`, `Tuple[int, ...]`).
 

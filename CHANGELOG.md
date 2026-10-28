@@ -11,6 +11,15 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 - Issue forms for bug reports and feature requests, a pull request template, and
   `SECURITY.md`, which points to GitHub's private vulnerability reporting.
 
+### Fixed
+
+- Assigning a Prodict to an attribute annotated with `dict`, `bool`, `tuple`, `List[T]`
+  or `Tuple[...]` no longer raises `AttributeError`, so `copy.deepcopy()` works on models
+  with a `dict` attribute ([#56](https://github.com/ramazanpolat/prodict/issues/56)).
+- `typing.Dict` and `Dict[K, V]` annotations accept dict values and convert them to
+  `Prodict` like `dict` does, instead of raising `TypeError`
+  ([#57](https://github.com/ramazanpolat/prodict/issues/57)).
+
 ## [0.8.23] - 2026-10-27
 
 The library code is unchanged from 0.8.22. This release publishes corrected package

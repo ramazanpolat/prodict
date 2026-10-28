@@ -1,6 +1,6 @@
 # Global comments:
 # self is avoided to fix #15
-from typing import Any, List
+from typing import Any, Dict, List
 import copy
 
 DICT_RESERVED_KEYS = vars(dict).keys()
@@ -34,6 +34,16 @@ def _dict_value(v, is_recursive, exclude_none, exclude_none_in_lists, convert_li
         ]
 
     return v
+
+
+def _is_dict_annotation(tp):
+    # dict, typing.Dict, Dict[K, V] and dict[K, V]
+    return tp is dict or tp is Dict or getattr(tp, '__origin__', None) is dict
+
+
+def _is_prodict_class(tp):
+    # isinstance(tp, type) rules out typing generics, which issubclass() rejects
+    return isinstance(tp, type) and not hasattr(tp, '__origin__') and issubclass(tp, Prodict)
 
 
 def _none_condition(v, is_recursive, exclude_none):
@@ -147,15 +157,17 @@ class Prodict(dict):
             constructor = int
         elif attr_type1 == list:
             constructor = list
-        elif isinstance(value, Prodict):
-            constructor = attr_type1.from_dict
         elif attr_type1 is Any:
             constructor = None
         elif isinstance(value, dict):
-            if attr_type1 == dict:
-                constructor = Prodict.from_dict
-            elif issubclass(attr_type1, Prodict):
-                constructor = self.attr_type(attr_name).from_dict
+            if _is_dict_annotation(attr_type1):
+                # #56, #57: a Prodict value is already in converted form
+                if not isinstance(value, Prodict):
+                    constructor = Prodict.from_dict
+            elif _is_prodict_class(attr_type1):
+                constructor = attr_type1.from_dict
+            # #56: other annotations (bool, tuple, List[T], ...) store dicts
+            # and Prodicts as they come
         elif attr_type1 is List:
             constructor = list
         elif hasattr(attr_type1, '__origin__'):
