@@ -727,3 +727,32 @@ class TestProdict(TestCase):
         assert 'thing' in result_recursive
         # The nested thing gets converted via to_dict
         assert isinstance(result_recursive['thing'], dict)
+
+    def test_positional_dict_keeps_annotated_values(self):
+        # #55: a positional dict must not lose the values of annotated attributes
+        class Model(Prodict):
+            n: int
+            child: Ram
+
+        m = Model({'n': '7', 'child': {'capacity': '8'}, 'extra': 1})
+        self.assertEqual(m, {'n': 7, 'child': {'brand': None, 'capacity': 8, 'unit': None},
+                             'extra': 1})
+        self.assertIsInstance(m.child, Ram)
+        self.assertEqual(Model({'n': '7'}), Model.from_dict({'n': '7'}))
+
+        # an iterable of pairs works the same way, and is only consumed once
+        self.assertEqual(Model(iter([('n', '3')])).n, 3)
+
+        # keyword arguments still win over the positional dict
+        self.assertEqual(Model({'n': '1'}, n='2').n, 2)
+
+        # positional values also win over init() defaults, like keyword arguments
+        class WithDefault(Prodict):
+            n: int
+
+            def init(self):
+                self.n = 5
+
+        self.assertEqual(WithDefault().n, 5)
+        self.assertEqual(WithDefault({'n': '6'}).n, 6)
+        self.assertIsNone(WithDefault({'n': None}).n)

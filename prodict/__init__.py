@@ -50,6 +50,15 @@ class Prodict(dict):
     def __init__(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # #55: annotated values that arrived in a positional dict (or iterable
+        # of pairs). Read them back from the dict itself, since args may be a
+        # one-shot iterator, so they survive the reset below and get converted.
+        positional = {
+            k: self_d921dfa9_4e93_4123_893d_a7e7eb783a32[k]
+            for k in self_d921dfa9_4e93_4123_893d_a7e7eb783a32.attr_types()
+            if k in self_d921dfa9_4e93_4123_893d_a7e7eb783a32 and k not in kwargs
+        }
+
         # #3: Set all properties to None
         for (
             k,
@@ -59,6 +68,8 @@ class Prodict(dict):
 
         # Set default values of annotated attributes
         self_d921dfa9_4e93_4123_893d_a7e7eb783a32.init()
+        for k, v in positional.items():
+            self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, v)
         self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attributes(**kwargs)
 
     def init(self):

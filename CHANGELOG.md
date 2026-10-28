@@ -11,6 +11,12 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 - Issue forms for bug reports and feature requests, a pull request template, and
   `SECURITY.md`, which points to GitHub's private vulnerability reporting.
 
+### Fixed
+
+- A dict passed positionally (`Model({...})`) no longer loses the values of annotated
+  attributes; they are converted like keyword arguments, which still take precedence
+  ([#55](https://github.com/ramazanpolat/prodict/issues/55)).
+
 ## [0.8.23] - 2026-10-27
 
 The library code is unchanged from 0.8.22. This release publishes corrected package
