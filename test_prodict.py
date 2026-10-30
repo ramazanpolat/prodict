@@ -1,8 +1,17 @@
+import __future__
+import gc
 import pickle
+import threading
+import weakref
+import sys
+import types
+from decimal import Decimal
+from unittest import mock
 from unittest import TestCase
-from typing import List, Any, Tuple, Dict
+from typing import List, Any, Tuple, Dict, Optional, Union, TypedDict
 import unittest
 from datetime import datetime
+import prodict
 from prodict import Prodict
 import copy
 
@@ -63,7 +72,7 @@ class AnyType(Prodict):
 
 class SimpleKeyValue(Prodict):
     int_key: int
-    str_key: str
+    str_key: Optional[str]  # #8: lets type checkers accept None
     float_key: float
 
 
@@ -83,6 +92,27 @@ class ListProdict(Prodict):
     li: List
     li_str: List[str]
     li_int: List[int]
+
+
+def make_module(name, source, future_annotations=False):
+    # runs source as a real module, so that class bodies and annotation
+    # resolution behave as they do in user code
+    module = types.ModuleType(name)
+    sys.modules[name] = module
+    flags = __future__.annotations.compiler_flag if future_annotations else 0
+    exec(compile(source, name, 'exec', flags=flags, dont_inherit=True), module.__dict__)
+    return module
+
+
+class ForwardNode(Prodict):
+    # string annotations, as with `from __future__ import annotations`
+    value: 'int'
+    children: 'List[ForwardNode]'
+
+
+class UnresolvedRef(Prodict):
+    later: 'NoSuchClass'  # noqa: F821
+    n: int
 
 
 class Recursive(Prodict):
@@ -803,3 +833,365 @@ class TestProdict(TestCase):
 
         m.d = Prodict(x=1)
         self.assertEqual(m.d, {'x': 1})
+
+    def test_optional_and_union_annotations(self):
+        # #38: Optional[X] converts as X; a union of several types stores the value as given
+        class M(Prodict):
+            n: Optional[int]
+            child: Optional[Ram]
+            either: Union[int, str]
+            maybe_either: Optional[Union[int, str]]
+            nums: List[Optional[int]]
+
+        m = M(n='7', child={'capacity': '8'}, either='7', maybe_either='7', nums=['1', None])
+        self.assertEqual(m.n, 7)
+        self.assertIsInstance(m.child, Ram)
+        self.assertEqual(m.child.capacity, 8)
+        self.assertEqual(m.either, '7')
+        self.assertEqual(m.maybe_either, '7')
+        self.assertEqual(m.nums, [1, None])
+        self.assertIs(type(M(either=7).either), int)
+        data = {'a': 1}
+        self.assertIs(M(either=data).either, data)
+        self.assertIsNone(M(n=None).n)
+
+    @unittest.skipIf(sys.version_info < (3, 10), 'X | Y annotations need Python 3.10')
+    def test_union_operator_annotations(self):
+        module = make_module('prodict_test_union_operator', (
+            'from prodict import Prodict\n'
+            'class M(Prodict):\n'
+            '    n: int | None\n'
+            '    either: int | str\n'))
+        self.assertEqual(module.M(n='7').n, 7)
+        self.assertEqual(module.M(either='7').either, '7')
+        self.assertIs(type(module.M(either=7).either), int)
+        data = {'a': 1}
+        self.assertIs(module.M(either=data).either, data)
+
+    @unittest.skipIf(sys.version_info < (3, 9), 'built-in generics need Python 3.9')
+    def test_builtin_generic_annotations(self):
+        # #21: list[T], tuple[...] and dict[K, V] work like their typing forms
+        module = make_module('prodict_test_builtin_generics', (
+            'from typing import Annotated\n'
+            'from prodict import Prodict\n'
+            'from test_prodict import Ram\n'
+            'class M(Prodict):\n'
+            '    nums: list[int]\n'
+            '    pair: tuple[int, ...]\n'
+            '    d: dict[str, int]\n'
+            '    rams: list[Ram]\n'
+            '    meta: Annotated[int, "unit: seconds"]\n'))
+        m = module.M(nums=['1', '2'], pair=[1, 2], d={'a': 1}, rams=[{'capacity': '4'}], meta='7')
+        self.assertEqual(m.nums, [1, 2])
+        self.assertEqual(m.pair, (1, 2))
+        self.assertIsInstance(m.d, Prodict)
+        self.assertIsInstance(m.rams[0], Ram)
+        self.assertEqual(m.rams[0].capacity, 4)
+        self.assertEqual(m.meta, 7)
+        self.assertEqual(module.M(nums=5).nums, 5)
+
+    def test_failed_conversion_stores_value_as_given(self):
+        class M(Prodict):
+            n: int
+            f: float
+            nums: List[int]
+            seq: list
+            pair: Tuple[int, int]
+
+        m = M(n='many', f='x', nums=['1', 'two'], seq=5, pair=5)
+        self.assertEqual(m, {'n': 'many', 'f': 'x', 'nums': [1, 'two'], 'seq': 5, 'pair': 5})
+        m.n = '3'
+        self.assertEqual(m.n, 3)
+        self.assertEqual(M(n=Prodict(a=1)).n, {'a': 1})
+        self.assertEqual(M(n=float('inf')).n, float('inf'))  # OverflowError
+
+    def test_list_items(self):
+        # List[T] passes each item through T, as before; List[Any] keeps items as they are
+        class M(Prodict):
+            anything: List[Any]
+            pairs: List[tuple]
+            flags: List[bool]
+            amounts: List[Decimal]
+            dicts: List[dict]
+
+        data, ram = {'a': 1}, Ram(capacity=1)
+        m = M(anything=[data, ram, '1', None], pairs=[[1, 2]], flags=[0, 1],
+              amounts=['1.5'], dicts=[{'a': 1}])
+        self.assertIs(m.anything[0], data)
+        self.assertIs(m.anything[1], ram)
+        self.assertEqual(m.anything[2:], ['1', None])
+        self.assertEqual(m.pairs, [(1, 2)])
+        self.assertIs(m.flags[0], False)
+        self.assertIs(m.flags[1], True)
+        self.assertEqual(m.amounts, [Decimal('1.5')])
+        self.assertIsInstance(m.dicts[0], Prodict)
+
+    def test_dicts_that_cannot_become_prodicts(self):
+        # keys named like dict methods, or not strings, keep the dict as given
+        class M(Prodict):
+            d: dict
+            rows: List[dict]
+
+        page, row, numbered = {'items': [1]}, {'items': 1}, {1: 'one'}
+        m = M(d=page, rows=[row, numbered, {'a': 1}])
+        self.assertIs(m.d, page)
+        self.assertIs(m.rows[0], row)
+        self.assertIs(m.rows[1], numbered)
+        self.assertIsInstance(m.rows[2], Prodict)
+
+    def test_list_items_that_cannot_be_converted(self):
+        class TD(TypedDict):
+            a: int
+
+        class M(Prodict):
+            amounts: List[Decimal]
+            maybe_amounts: List[Optional[Decimal]]
+            typed: List[TD]
+
+        item = {'a': 1}
+        m = M(amounts=['1.5', 'bad'], maybe_amounts=['2.5', None], typed=[item])
+        self.assertEqual(m.amounts, [Decimal('1.5'), 'bad'])
+        self.assertEqual(m.maybe_amounts, [Decimal('2.5'), None])
+        self.assertIsInstance(m.maybe_amounts[0], Decimal)
+        self.assertIs(m.typed[0], item)
+
+    @unittest.skipIf(sys.version_info < (3, 9), 'Annotated needs Python 3.9')
+    def test_annotated_is_converted_as_its_type(self):
+        from typing import Annotated
+        # get_type_hints() strips Annotated; _convert handles it when it does not
+        self.assertEqual(prodict._convert(Annotated[int, 'meta'], '7'), 7)
+        self.assertEqual(prodict._convert_item(Annotated[Decimal, 'meta'], '1.5'), Decimal('1.5'))
+
+    def test_annotations_are_inherited(self):
+        class Base(Prodict):
+            id: int
+
+        class Child(Base):
+            name: str
+
+        class Empty(Base):
+            pass
+
+        class Override(Base):
+            id: str
+
+        class Other(Prodict):
+            size: float
+
+        class Both(Child, Other):
+            pass
+
+        self.assertEqual(Child(id='1', name=2), {'id': 1, 'name': '2'})
+        self.assertEqual(Child(), {'id': None, 'name': None})
+        self.assertEqual(Child.attr_names(), ['id', 'name'])
+        self.assertEqual(Empty(id='1').id, 1)
+        self.assertEqual(Override(id=1).id, '1')
+        self.assertEqual(Both(id='1', name=2, size='3'), {'id': 1, 'name': '2', 'size': 3.0})
+
+    def test_string_annotations(self):
+        node = ForwardNode(value='1', children=[{'value': '2', 'children': []}])
+        self.assertEqual(node.value, 1)
+        self.assertIsInstance(node.children[0], ForwardNode)
+        self.assertEqual(node.children[0].value, 2)
+
+        # an annotation that cannot be resolved stores values as given; the others still convert
+        data = {'a': 1}
+        ref = UnresolvedRef(later=data, n='2')
+        self.assertIs(ref.later, data)
+        self.assertEqual(ref.n, 2)
+
+    def test_future_annotations(self):
+        module = make_module('prodict_test_future', (
+            'from typing import ClassVar, List, Optional\n'
+            'from prodict import Prodict\n'
+            'class Node(Prodict):\n'
+            '    VERSION: ClassVar[int] = 1\n'
+            '    value: int\n'
+            '    children: List[Node]\n'
+            '    parent: Optional[Node]\n'
+            '    other: Missing\n'
+            'class Leaf(Node):\n'
+            '    label: str\n'), future_annotations=True)
+        node = module.Node(value='1', children=[{'value': '2'}], parent={'value': '0'}, other={'a': 1})
+        self.assertEqual(node.value, 1)
+        self.assertIsInstance(node.children[0], module.Node)
+        self.assertIsInstance(node.parent, module.Node)
+        self.assertIs(type(node.other), dict)
+        self.assertNotIn('VERSION', node)
+        self.assertEqual(module.Leaf(value='3', label=4), {'value': 3, 'children': None, 'parent': None,
+                                                          'other': None, 'label': '4'})
+
+    def test_forward_reference_defined_later(self):
+        module = make_module('prodict_test_forward', (
+            'from prodict import Prodict\n'
+            'class Owner(Prodict):\n'
+            '    pet: Pet\n'
+            '    age: int\n'), future_annotations=True)
+        self.assertIs(type(module.Owner(pet={'name': 'Rex'}, age='3').pet), dict)
+        exec('class Pet(Prodict):\n    name: str\n', module.__dict__)
+        owner = module.Owner(pet={'name': 'Rex'}, age='3')
+        self.assertIsInstance(owner.pet, module.Pet)
+        self.assertEqual(owner.age, 3)
+
+    def test_forward_reference_named_like_class_var(self):
+        module = make_module('prodict_test_class_var_name', (
+            'from prodict import Prodict\n'
+            'class Holder(Prodict):\n'
+            '    variant: ClassVariant\n'), future_annotations=True)
+        self.assertEqual(module.Holder.attr_names(), ['variant'])
+        exec('class ClassVariant(Prodict):\n    code: int\n', module.__dict__)
+        self.assertIsInstance(module.Holder(variant={'code': '1'}).variant, module.ClassVariant)
+        self.assertIs(module.Holder.attr_types()['variant'], module.ClassVariant)
+
+    def test_qualified_name_ending_in_class_var_is_a_field(self):
+        module = make_module('prodict_test_qualified_class_var', (
+            'import types\n'
+            'from prodict import Prodict\n'
+            'models = types.SimpleNamespace()\n'
+            'class Holder(Prodict):\n'
+            '    child: models.ClassVar\n'), future_annotations=True)
+        self.assertEqual(module.Holder.attr_names(), ['child'])
+        exec('class Child(Prodict):\n    pass\nmodels.ClassVar = Child\n', module.__dict__)
+        self.assertIsInstance(module.Holder(child={}).child, module.Child)
+
+    def test_internal_names_do_not_hide_keys(self):
+        p = Prodict(_prodict_attr_types=7)
+        p.attr_types()
+        self.assertEqual(p._prodict_attr_types, 7)
+
+    def test_list_item_isinstance_failure(self):
+        class Strict(type):
+            def __instancecheck__(cls, item):
+                raise ValueError('no isinstance() here')
+
+        class Target(metaclass=Strict):
+            def __init__(self, item):
+                self.item = item
+
+        class M(Prodict):
+            targets: List[Target]
+
+        self.assertEqual(M(targets=['x']).targets, ['x'])
+
+    def test_aliased_class_var(self):
+        module = make_module('prodict_test_aliased_class_var', (
+            'import typing as t\n'
+            'from prodict import Prodict\n'
+            'class M(Prodict):\n'
+            '    registry: t.ClassVar[t.Dict[str, Later]] = {}\n'
+            '    bare: t.ClassVar = 1\n'
+            '    n: int\n'), future_annotations=True)
+        self.assertEqual(module.M.attr_names(), ['n'])
+        self.assertEqual(module.M(n='2'), {'n': 2})
+
+    def test_class_var_lookup_that_raises(self):
+        module = make_module('prodict_test_lazy_lookup', (
+            'from prodict import Prodict\n'
+            'class Lazy:\n'
+            '    def __getattr__(self, name):\n'
+            '        raise RuntimeError("not loaded")\n'
+            'lazy = Lazy()\n'
+            'class M(Prodict):\n'
+            '    x: lazy.ClassVar\n'
+            '    n: int\n'), future_annotations=True)
+        self.assertEqual(module.M(x='raw', n='2'), {'x': 'raw', 'n': 2})
+
+    def test_assignment_uses_one_annotation_snapshot(self):
+        class M(Prodict):
+            n: int
+
+        m = M()
+        # another thread may change the annotations between two lookups
+        with mock.patch.object(M, 'attr_types', side_effect=[{'n': int}, {}]):
+            m.set_attribute('n', '1')
+        self.assertEqual(m.n, 1)
+
+    def test_resolution_order_of_names(self):
+        # a class attribute named like a class: the annotation means the class
+        # in the module, whether or not another annotation fails to resolve
+        module = make_module('prodict_test_names', (
+            'from prodict import Prodict\n'
+            'class Pet(Prodict):\n'
+            '    name: str\n'
+            'class Owner(Prodict):\n'
+            '    Pet: Pet = None\n'
+            'class BrokenOwner(Prodict):\n'
+            '    Pet: Pet = None\n'
+            '    other: Missing\n'), future_annotations=True)
+        self.assertIs(module.Owner.attr_types()['Pet'], module.Pet)
+        self.assertIs(module.BrokenOwner.attr_types()['Pet'], module.Pet)
+
+    def test_forward_reference_from_threads(self):
+        module = make_module('prodict_test_threads', (
+            'from prodict import Prodict\n'
+            'class Owner(Prodict):\n'
+            '    pet: Pet\n'), future_annotations=True)
+        module.Owner()
+        exec('class Pet(Prodict):\n    name: str\n', module.__dict__)
+        barrier, results, errors = threading.Barrier(8), [], []
+
+        def work():
+            barrier.wait()
+            try:
+                results.append(type(module.Owner(pet={'name': 'Rex'}).pet))
+            except Exception as error:  # pragma: no cover
+                errors.append(error)
+
+        threads = [threading.Thread(target=work) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(errors, [])
+        self.assertEqual(results, [module.Pet] * 8)
+
+    def test_models_can_be_garbage_collected(self):
+        def make():
+            class Node(Prodict):
+                parent: 'Node'
+                value: int
+
+            Node(value='1', parent={'value': '2'})
+            return weakref.ref(Node)
+
+        ref = make()
+        gc.collect()
+        self.assertIsNone(ref())
+
+    @unittest.skipIf(sys.version_info < (3, 14), 'lazy annotations need Python 3.14')
+    def test_lazy_annotations(self):
+        module = make_module('prodict_test_lazy', (
+            'from prodict import Prodict\n'
+            'class M(Prodict):\n'
+            '    other: NoSuchName\n'
+            '    n: int\n'))
+        data = {'a': 1}
+        m = module.M(other=data, n='2')
+        self.assertIs(m.other, data)
+        self.assertEqual(m.n, 2)
+
+    def test_class_var_annotations_are_not_keys(self):
+        from typing import ClassVar
+
+        class Base(Prodict):
+            VERSION: ClassVar[int] = 1
+            id: int
+
+        class Child(Base):
+            name: str
+
+        self.assertEqual(Child(id='2'), {'id': 2, 'name': None})
+        self.assertEqual(Child().VERSION, 1)
+        self.assertEqual(Base.attr_names(), ['id'])
+
+    def test_prodict_values_keep_identity(self):
+        class M(Prodict):
+            child: Ram
+            any_model: Prodict
+            rams: List[Ram]
+
+        ram = Ram(capacity=4)
+        m = M(child=ram, any_model=ram, rams=[ram])
+        self.assertIs(m.child, ram)
+        self.assertIs(m.any_model, ram)
+        self.assertIs(m.rams[0], ram)
