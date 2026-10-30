@@ -1323,7 +1323,7 @@ class TestProdict(TestCase):
             self.assertEqual(p.name, 'loop')
         shared = {'v': 1}
         both = Prodict(a=shared, b=shared)
-        self.assertIs(both.a, both.b)
+        self.assertEqual(both.a, both.b)  # converted once per occurrence, as before
 
     def test_from_dict_with_a_custom_constructor(self):
         self.assertEqual(Strict.from_dict({'x': 1}), {'x': 1})
@@ -1551,3 +1551,81 @@ class TestProdict(TestCase):
         with self.assertRaises(AttributeError):
             del p.__x__
         self.assertEqual(p['__x__'], 2)
+
+    def test_one_dict_as_several_models(self):
+        class A(Prodict):
+            x: int
+
+        class B(Prodict):
+            x: str
+
+        class H(Prodict):
+            a: A
+            b: B
+            raw: dict
+
+        d = {'x': '1'}
+        h = H(a=d, b=d, raw=d)
+        self.assertEqual((h.a.x, h.b.x), (1, '1'))
+        self.assertIs(type(h.raw), Prodict)
+
+    def test_cycle_through_several_models(self):
+        class Child(Prodict):
+            name: str
+
+        class Parent(Prodict):
+            child: Child
+
+        d = {'name': 'loop'}
+        d['child'] = d
+        d['me'] = d
+        parent = Parent(d)
+        self.assertIs(parent.me, parent)
+        self.assertIsInstance(parent.child, Child)
+        self.assertIs(parent.child.child, parent.child)
+
+    def test_failed_model_leaves_no_trace(self):
+        class Rejecting(Prodict):
+            def __init__(self, data):
+                super().__init__(data)
+                raise ValueError('rejected')
+
+        class H(Prodict):
+            bad: Rejecting
+
+        d = {}
+        child = {'parent': d}
+        d['child'] = child
+        h = H(bad=d, child=child)
+        self.assertIs(h.bad, d)
+        self.assertIs(type(h.child.parent), Prodict)
+
+    def test_from_dict_with_args_and_kwargs(self):
+        class Flexible(Prodict):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+
+        self.assertEqual(Flexible.from_dict({'cls': 1}), {'cls': 1})
+        self.assertEqual(Flexible.from_dict({'self': 2}), {'self': 2})
+
+    def test_delete_a_read_only_property(self):
+        class R(Prodict):
+            @property
+            def p(self):
+                return 3
+
+        r = R({'p': 99})
+        with self.assertRaises(AttributeError):
+            del r.p
+        self.assertEqual(r['p'], 99)
+
+    def test_conversion_that_recurses_keeps_the_value(self):
+        class Endless:
+            def __int__(self):
+                return int(self)
+
+        class M(Prodict):
+            n: int
+
+        value = Endless()
+        self.assertIs(M(n=value).n, value)
