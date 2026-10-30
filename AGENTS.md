@@ -14,7 +14,7 @@ pip resolves to 0.8.22, the last version that declares 3.7 support.
 |---|---|
 | `prodict/__init__.py` | The whole library. |
 | `test_prodict.py` | Unit tests (`unittest.TestCase`, run with pytest). |
-| `docs/` | Tutorial and guides. Every `>>>` block is a doctest. |
+| `docs/` | Tutorial and guides. Every `>>>` block is a doctest, as in `README.md`. |
 | `examples/NN-name/` | Runnable `main.py` plus a README showing its exact output. |
 | `pyproject.toml` | Metadata, hatchling build, `dev` dependency group, pytest config. |
 | `.github/workflows/pythonapp.yml` | CI: `test` matrix, `build`, `deploy`. |
@@ -25,7 +25,7 @@ pip resolves to 0.8.22, the last version that declares 3.7 support.
 Requires [uv](https://docs.astral.sh/uv/). No other setup:
 
 ```bash
-uv run pytest                                        # unit tests + doctests in docs/
+uv run pytest                                        # unit tests + doctests in docs/ and README.md
 for e in examples/*/main.py; do uv run python "$e"; done
 uv run --python 3.8 pytest                           # any other supported version
 uvx flake8 . --select=E9,F63,F7,F82                  # the lint CI enforces
@@ -37,8 +37,9 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
 
 ## Rules for changes
 
-- **Keep docs true.** Behavior changes must update `docs/` (doctests fail otherwise) and
-  any affected `examples/` README, whose output block must match `main.py` exactly.
+- **Keep docs true.** Behavior changes must update `docs/` and `README.md` (doctests fail
+  otherwise) and any affected `examples/` README, whose output block must match `main.py`
+  exactly.
 - **Stay compatible with Python 3.8 syntax** in the library, tests, docs and examples:
   `typing.List` rather than `list[int]`, no `X | Y` unions, no `match`.
 - **Do not change `version`** in `pyproject.toml` unless the change is a release (see

@@ -56,7 +56,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["test_prodict.py", "docs"]
+testpaths = ["test_prodict.py", "docs", "README.md"]
 addopts = ["--doctest-glob=*.md"]
 
 [tool.hatch.build.targets.wheel]
