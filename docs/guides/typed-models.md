@@ -135,7 +135,8 @@ A subclass of a model has the annotations of its base classes too:
 ## Unannotated keys
 
 Keys without an annotation are allowed on any model and stored without conversion,
-except that dicts become `Prodict` instances:
+except that plain dicts become `Prodict` instances, at every level. A Prodict is stored
+as it is, not copied:
 
 ```python
 >>> p = Product(name='pen', color='blue', size={'cm': 14})
@@ -147,8 +148,8 @@ except that dicts become `Prodict` instances:
 ## Passing data in
 
 Give a model its data as keyword arguments, through `from_dict()`, or as a positional
-dict. Annotated attributes are converted the same way in each case, and keyword arguments
-win over a positional dict:
+dict, like a dict. All three are treated the same way: annotated attributes are
+converted, nested dicts become Prodicts, and keyword arguments win over a positional dict:
 
 ```python
 >>> class Point(Prodict):
@@ -158,6 +159,8 @@ win over a positional dict:
 ({'x': 1}, {'x': 1}, {'x': 1})
 >>> Point({'x': '1'}, x='2')
 {'x': 2}
+>>> Point({'x': '1', 'label': {'text': 'origin'}}).label.text
+'origin'
 
 ```
 
@@ -182,10 +185,12 @@ arguments are applied, so keyword arguments win:
 
 `init()` runs for every instance, so mutable defaults such as lists are never shared.
 
-## Names you cannot use
+## Names that are keys but not attributes
 
 - **Names of `dict` methods** (`items`, `keys`, `values`, `get`, `update`, `copy`, ...)
-  cannot be attributes. Setting one raises `TypeError`.
+  work as keys, as in any dict: in the data you pass in and with brackets. They cannot be
+  attributes: reading `p.items` returns the method, and setting or deleting one with a
+  dot raises `TypeError`.
 - **Names of Prodict methods** (`to_dict`, `from_dict`, `init`, `set_attribute`, ...)
   can be set, but reading them with a dot still returns the method; only `p['to_dict']`
   reaches the value. Avoid them.
@@ -197,7 +202,10 @@ arguments are applied, so keyword arguments win:
 >>> p.set_attribute('first-name', 'Ada')
 >>> p['first-name']
 'Ada'
->>> p.items = 1
+>>> page = Prodict.from_dict({'items': [1, 2], 'total': 2})
+>>> page['items'], page.total
+([1, 2], 2)
+>>> page.items = 1
 Traceback (most recent call last):
     ...
 TypeError: You cannot set a reserved name as attribute

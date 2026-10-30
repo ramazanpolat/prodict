@@ -8,6 +8,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 
 ### Added
 
+- `del p.key` deletes a key, and `dir(p)` lists the keys, so a REPL or notebook can
+  complete them.
 - Issue forms for bug reports and feature requests, a pull request template, and
   `SECURITY.md`, which points to GitHub's private vulnerability reporting.
 
@@ -21,8 +23,13 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 - A Prodict assigned to an attribute annotated with its class, a base class, `dict` or
   `List[...]` of its class is stored as it is, not copied.
 - `List[dict]` items become `Prodict` instances, like a `dict` attribute, instead of
-  plain dict copies; an item that cannot become one (a key such as `items`) stays as
-  given.
+  plain dict copies.
+- A Prodict assigned to an unannotated attribute, or passed in as data, is stored as it
+  is, not copied.
+- `from_dict(d)` is `cls(d)`: a positional dict, keyword arguments and `from_dict()` are
+  treated the same way.
+- `copy.deepcopy()` and `pickle` restore the data as it is stored: `init()` does not run
+  again and values are not converted again.
 - `ClassVar` annotations are left out of the model: they no longer appear in every
   instance as `None`.
 - `Annotated[T, ...]` annotations convert as `T`.
@@ -39,9 +46,13 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   ([#21](https://github.com/ramazanpolat/prodict/issues/21)).
 - `List[Any]`, `List[Optional[T]]` and other lists of non-class types no longer raise
   `TypeError`.
-- A dict with a key Prodict cannot hold as an attribute (`items`, `keys`, a non-string
-  key) given to a `dict` or `Dict[K, V]` attribute is stored as given instead of raising
-  `TypeError`.
+- Keys named like `dict` methods (`items`, `keys`, `pop`, ...) and keys that are not
+  strings work in `from_dict()`, the constructor, `copy`, `copy.deepcopy()` and `pickle`,
+  at any depth, instead of raising `TypeError`.
+- Nested dicts passed positionally (`Prodict({'a': {'b': 1}})`) become Prodicts, as with
+  `from_dict()` ([#42](https://github.com/ramazanpolat/prodict/issues/42)).
+- `copy.deepcopy()` and `pickle` handle a Prodict that contains itself, and keep shared
+  values shared, instead of raising `RecursionError`.
 - String annotations, including `from __future__ import annotations`, convert values. An
   annotation that cannot be resolved stores values as given instead of raising
   `TypeError` for dicts, and does not stop the model's other annotations from converting.

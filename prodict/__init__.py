@@ -1,7 +1,6 @@
 # Global comments:
 # self is avoided to fix #15
 from typing import Any, ClassVar, ForwardRef, List, Union, get_args, get_origin, get_type_hints
-import copy
 import re
 import sys
 import threading
@@ -244,6 +243,20 @@ def _convert_item(tp, item):
     return _convert(tp, item)
 
 
+def _store(prodict, key, value):
+    """
+    Stores value under key, converted as the key's annotation says; an
+    unannotated plain dict becomes a Prodict. Any key a dict accepts is
+    accepted, including names of dict methods and keys that are not strings.
+    """
+    types = prodict.attr_types()  # one snapshot for the lookup and the conversion
+    if key in types:
+        value = _convert(types[key], value)
+    elif isinstance(value, dict) and not isinstance(value, Prodict):
+        value = Prodict.from_dict(value)
+    dict.__setitem__(prodict, key, value)
+
+
 def _none_condition(v, is_recursive, exclude_none):
     return v is not None if exclude_none else True
 
@@ -256,29 +269,23 @@ class Prodict(dict):
     """
 
     def __init__(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, *args, **kwargs):
+        self = self_d921dfa9_4e93_4123_893d_a7e7eb783a32
         super().__init__(*args, **kwargs)
 
-        # #55: annotated values that arrived in a positional dict (or iterable
-        # of pairs). Read them back from the dict itself, since args may be a
-        # one-shot iterator, so they survive the reset below and get converted.
-        positional = {
-            k: self_d921dfa9_4e93_4123_893d_a7e7eb783a32[k]
-            for k in self_d921dfa9_4e93_4123_893d_a7e7eb783a32.attr_types()
-            if k in self_d921dfa9_4e93_4123_893d_a7e7eb783a32 and k not in kwargs
-        }
+        # #55, #42: the data that arrived positionally (a dict or an iterable of
+        # pairs, possibly a one-shot iterator), read back from the dict itself
+        positional = {k: v for k, v in self.items() if k not in kwargs}
 
-        # #3: Set all properties to None
-        for (
-            k,
-            v,
-        ) in self_d921dfa9_4e93_4123_893d_a7e7eb783a32.attr_types().items():
-            self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, None)
+        # #3: every annotated attribute exists, None until set
+        for k in self.attr_types():
+            dict.__setitem__(self, k, None)
 
-        # Set default values of annotated attributes
-        self_d921dfa9_4e93_4123_893d_a7e7eb783a32.init()
+        # defaults first, then the data: positional values, then keyword arguments
+        self.init()
         for k, v in positional.items():
-            self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, v)
-        self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attributes(**kwargs)
+            _store(self, k, v)
+        for k, v in kwargs.items():
+            _store(self, k, v)
 
     def init(self):
         ...
@@ -286,21 +293,15 @@ class Prodict(dict):
     def __new__(cls, *args, **kwargs):
         return super(Prodict, cls).__new__(cls, *args, **kwargs)
 
-    def __getstate__(self):
-        return self.to_dict()
-
     def __setstate__(self, state):
-        return Prodict.from_dict(state)
-
-    def __deepcopy__(self, memo=None):
-        new = self.from_dict({})
-        for key in self.keys():
-            new.set_attribute(key, copy.deepcopy(self[key], memo=memo))
-        return new
+        # pickle and copy restore the data as it is stored, without init() or
+        # conversion; pickles from 0.8.x carry a copy of the data as state,
+        # which is not needed
+        pass
 
     @classmethod
     def from_dict(cls, d: dict):
-        return cls(**d)
+        return cls(d)
 
     @classmethod
     def attr_has_default_value(cls, attr_name: str) -> bool:
@@ -364,15 +365,7 @@ class Prodict(dict):
     def set_attribute(self, attr_name, value):
         if attr_name in DICT_RESERVED_KEYS:
             raise TypeError("You cannot set a reserved name as attribute")
-        types = self.attr_types()  # one snapshot for the lookup and the conversion
-        if attr_name in types:
-            value = _convert(types[attr_name], value)
-        elif isinstance(value, dict):
-            if isinstance(value, Prodict):
-                value = value.from_dict(value)
-            else:
-                value = Prodict.from_dict(value)
-        self.update({attr_name: value})
+        _store(self, attr_name, value)
 
     def set_attributes(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, **d):
         for k, v in d.items():
@@ -386,6 +379,19 @@ class Prodict(dict):
 
     def __setattr__(self, name: str, value) -> None:
         self.set_attribute(name, value)
+
+    def __delattr__(self, name: str) -> None:
+        if name in DICT_RESERVED_KEYS:
+            raise TypeError("You cannot delete a reserved name as attribute")
+        try:
+            del self[name]
+        except KeyError:
+            raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}") from None
+
+    def __dir__(self):
+        # keys that work as attributes, for completion in a REPL or notebook
+        keys = [k for k in self.keys() if isinstance(k, str) and k.isidentifier()]
+        return sorted(set(super().__dir__()) | set(keys))
 
     def to_dict(
         self,

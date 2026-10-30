@@ -104,6 +104,15 @@ def make_module(name, source, future_annotations=False):
     return module
 
 
+class Counter(Prodict):
+    # module level, so that pickle can find it
+    n: int
+    log: List[str]
+
+    def init(self):
+        self.log = ['created']
+
+
 class ForwardNode(Prodict):
     # string annotations, as with `from __future__ import annotations`
     value: 'int'
@@ -926,18 +935,17 @@ class TestProdict(TestCase):
         self.assertEqual(m.amounts, [Decimal('1.5')])
         self.assertIsInstance(m.dicts[0], Prodict)
 
-    def test_dicts_that_cannot_become_prodicts(self):
-        # keys named like dict methods, or not strings, keep the dict as given
+    def test_dicts_with_any_keys_become_prodicts(self):
+        # keys named like dict methods, and keys that are not strings, are fine
         class M(Prodict):
             d: dict
             rows: List[dict]
 
-        page, row, numbered = {'items': [1]}, {'items': 1}, {1: 'one'}
-        m = M(d=page, rows=[row, numbered, {'a': 1}])
-        self.assertIs(m.d, page)
-        self.assertIs(m.rows[0], row)
-        self.assertIs(m.rows[1], numbered)
-        self.assertIsInstance(m.rows[2], Prodict)
+        m = M(d={'items': [1]}, rows=[{'items': 1}, {1: 'one'}, {'a': 1}])
+        self.assertIsInstance(m.d, Prodict)
+        self.assertEqual(m.d['items'], [1])
+        self.assertTrue(all(type(row) is Prodict for row in m.rows))
+        self.assertEqual(m.rows[1][1], 'one')
 
     def test_list_items_that_cannot_be_converted(self):
         class TD(TypedDict):
@@ -1195,3 +1203,79 @@ class TestProdict(TestCase):
         self.assertIs(m.child, ram)
         self.assertIs(m.any_model, ram)
         self.assertIs(m.rams[0], ram)
+
+    def test_any_key_is_accepted_as_data(self):
+        # keys named like dict methods, and keys that are not strings, work as in a dict
+        page = Prodict.from_dict({'items': [1, 2], 'total': 2, 'meta': {'keys': 'a'}})
+        self.assertEqual(page['items'], [1, 2])
+        self.assertEqual(page.total, 2)
+        self.assertIsInstance(page.meta, Prodict)
+        self.assertEqual(page.meta['keys'], 'a')
+        self.assertTrue(callable(page.items))
+        self.assertEqual(Prodict(items=1)['items'], 1)
+        self.assertEqual(Prodict.from_dict({1: 'one'})[1], 'one')
+        with self.assertRaises(TypeError):
+            page.items = 1  # still not as an attribute
+
+    def test_positional_dict_is_like_from_dict(self):
+        # #42: nested dicts passed positionally become Prodicts too
+        data = {'x': 100, 'foo': {'z': 300, 'deeper': {'w': 1}}}
+        p = Prodict(data)
+        self.assertEqual(p.foo.z, 300)
+        self.assertEqual(p.foo.deeper.w, 1)
+        self.assertIs(type(p.foo), Prodict)
+        self.assertEqual(p, Prodict.from_dict(data))
+        self.assertEqual(Prodict([('foo', {'z': 1})]).foo.z, 1)
+
+    def test_prodict_values_are_not_copied(self):
+        other = Prodict(x=1)
+        p = Prodict(a=other)
+        p.b = other
+        self.assertIs(p.a, other)
+        self.assertIs(p.b, other)
+        self.assertIs(Prodict({'c': other}).c, other)
+
+    def test_copy_deepcopy_and_pickle_keep_data_as_stored(self):
+        c = Counter(n='1')
+        c['n'] = 'raw'  # a raw value, set without conversion
+        c.log.append('changed')
+        c['items'] = [1]
+        for clone in (copy.copy(c), copy.deepcopy(c), pickle.loads(pickle.dumps(c))):
+            self.assertIsInstance(clone, Counter)
+            self.assertEqual(clone, {'n': 'raw', 'log': ['created', 'changed'], 'items': [1]})
+        self.assertIs(copy.copy(c).log, c.log)
+        self.assertIsNot(copy.deepcopy(c).log, c.log)
+
+    def test_deepcopy_and_pickle_of_shared_and_cyclic_values(self):
+        shared = Prodict(v=1)
+        p = Prodict(a=shared, b=shared)
+        p['me'] = p
+        for clone in (copy.deepcopy(p), pickle.loads(pickle.dumps(p))):
+            self.assertIs(clone.a, clone.b)
+            self.assertIs(clone['me'], clone)
+            self.assertIsNot(clone.a, shared)
+
+    def test_pickles_from_0_8_load(self):
+        # Prodict(a=1, b={'c': 2}) pickled by prodict 0.8.23 (protocol 2)
+        old = (b'\x80\x02cprodict\nProdict\nq\x00)\x81q\x01(X\x01\x00\x00\x00aq\x02K\x01X\x01\x00\x00\x00b'
+               b'q\x03h\x00)\x81q\x04X\x01\x00\x00\x00cq\x05K\x02s}q\x06h\x05K\x02sbu}q\x07(h\x02K\x01h\x03h\x04ub.')
+        p = pickle.loads(old)
+        self.assertEqual(p, {'a': 1, 'b': {'c': 2}})
+        self.assertIsInstance(p.b, Prodict)
+        self.assertEqual(vars(p), {})
+
+    def test_delete_attribute(self):
+        p = Prodict(a=1, b=2)
+        del p.a
+        self.assertEqual(p, {'b': 2})
+        with self.assertRaises(AttributeError):
+            del p.a
+        with self.assertRaises(TypeError):
+            del p.items
+
+    def test_dir_lists_keys(self):
+        p = Prodict(alpha=1, **{'not-an-identifier': 2})
+        names = dir(p)
+        self.assertIn('alpha', names)
+        self.assertIn('to_dict', names)
+        self.assertNotIn('not-an-identifier', names)

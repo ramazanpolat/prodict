@@ -48,13 +48,13 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
 
 ## How the library works
 
-- `Prodict.__init__` calls `dict.__init__` with all arguments, reads back the values of
-  annotated keys that came in positionally, sets every annotated attribute to `None`, calls
-  the `init()` hook (where subclasses set defaults), then applies the positional values and
-  the keyword arguments through `set_attribute()`, which converts them. Keyword arguments
-  win. Unannotated nested dicts passed positionally stay plain dicts.
-- `__getattr__` / `__setattr__` map attributes to keys. A missing key raises
-  `AttributeError`.
+- `Prodict.__init__` calls `dict.__init__` with all arguments, reads back the data that
+  came in positionally, sets every annotated attribute to `None`, calls the `init()` hook
+  (where subclasses set defaults), then stores the positional data and the keyword
+  arguments again through `_store()`, which converts them. Keyword arguments win.
+  `from_dict(d)` is `cls(d)`.
+- `__getattr__` / `__setattr__` / `__delattr__` map attributes to keys. A missing key
+  raises `AttributeError`. `__dir__` adds the keys that are identifiers.
 - `attr_types()` returns the annotations of the class and its base classes, via
   `typing.get_type_hints()`, without `ClassVar` ones. If that fails, each annotation is
   resolved on its own (`_resolve`, same name lookup order) and the ones that cannot be keep
@@ -62,9 +62,9 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   converts once its class exists. The result is stored on the class itself, under a name
   that is not an identifier, and written under a lock. `has_attr()` is
   `name in attr_types()`.
-- `set_attribute()` converts values for annotated attributes with `_convert(annotation,
-  value)`: `int`, `float`, `str`, `list`; `List[T]` / `list[T]` (item-wise);
-  `Tuple[...]` / `tuple[...]` (to `tuple`); `dict` / `Dict[K, V]` / `dict[K, V]` and
+- `_store()` (used by the constructor and `set_attribute()`) converts values for
+  annotated attributes with `_convert(annotation, value)`: `int`, `float`, `str`, `list`;
+  `List[T]` / `list[T]` (item-wise); `Tuple[...]` / `tuple[...]` (to `tuple`); `dict` / `Dict[K, V]` / `dict[K, V]` and
   `Prodict` (plain dict to `Prodict`); Prodict subclasses (`from_dict`, unless the value
   already is an instance); `Optional[T]` / `T | None` / `Annotated[T, ...]` (as `T`).
   `List[T]` items go through `T` for any class `T` (`_convert_item`). Anything else (`Any`,
@@ -72,18 +72,20 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   is a value whose conversion call raises: an annotation never makes an assignment
   fail. `None` is never converted.
   `p['key'] = ...` and `update()` are plain dict operations and bypass conversion.
-- Unannotated dict values become `Prodict` instances.
-- Names of `dict` methods (`DICT_RESERVED_KEYS`) cannot be set as attributes (`TypeError`).
+- Unannotated plain dict values become `Prodict` instances; a Prodict is stored as it is.
+- Names of `dict` methods (`DICT_RESERVED_KEYS`) are accepted as keys in data, but
+  `set_attribute()` / `__setattr__` / `__delattr__` refuse them (`TypeError`).
+- There is no `__getstate__` or `__deepcopy__`: `copy`, `deepcopy` and `pickle` use the
+  dict protocol and restore the stored data without `init()` or conversion.
+  `__setstate__` ignores the state that pickles from 0.8.x carry.
 - `__init__` and `set_attributes` name their first parameter
   `self_d921dfa9_4e93_4123_893d_a7e7eb783a32` so that `self` works as a key
   (`test_issue15`). Keep it that way.
 - `to_dict()` options: `is_recursive`, `exclude_none`, `convert_list_items`,
   `exclude_none_in_lists` (legacy). See `docs/guides/serialization.md`.
 
-Known limitations: unannotated nested dicts passed positionally stay plain dicts, dicts
-inside lists are not converted, and `from_dict()`, `copy`, `deepcopy` and `pickle` fail on
-keys named like `dict` methods (`items`) or on non-string keys, and a Prodict that
-contains itself cannot be deep-copied or pickled (`RecursionError`).
+Known limitations: dicts inside lists are not converted unless annotated (`List[Model]`),
+and `p['key'] = ...` / `update()` store values without conversion.
 
 ## CI
 
