@@ -6,6 +6,7 @@ import weakref
 import sys
 import types
 from decimal import Decimal
+from unittest import mock
 from unittest import TestCase
 from typing import List, Any, Tuple, Dict, Optional, Union, TypedDict
 import unittest
@@ -1046,24 +1047,39 @@ class TestProdict(TestCase):
         self.assertEqual(p._prodict_attr_types, 7)
 
     def test_list_item_isinstance_failure(self):
-        from typing import Protocol, runtime_checkable
+        class Strict(type):
+            def __instancecheck__(cls, item):
+                raise ValueError('no isinstance() here')
 
-        @runtime_checkable
-        class Sized(Protocol):
-            @property
-            def size(self) -> int:
-                ...
-
-        class NotReady:
-            @property
-            def size(self):
-                raise ValueError('not ready')
+        class Target(metaclass=Strict):
+            def __init__(self, item):
+                self.item = item
 
         class M(Prodict):
-            items_list: List[Sized]
+            targets: List[Target]
 
-        item = NotReady()
-        self.assertIs(M(items_list=[item]).items_list[0], item)
+        self.assertEqual(M(targets=['x']).targets, ['x'])
+
+    def test_aliased_class_var(self):
+        module = make_module('prodict_test_aliased_class_var', (
+            'import typing as t\n'
+            'from prodict import Prodict\n'
+            'class M(Prodict):\n'
+            '    registry: t.ClassVar[t.Dict[str, Later]] = {}\n'
+            '    bare: t.ClassVar = 1\n'
+            '    n: int\n'), future_annotations=True)
+        self.assertEqual(module.M.attr_names(), ['n'])
+        self.assertEqual(module.M(n='2'), {'n': 2})
+
+    def test_assignment_uses_one_annotation_snapshot(self):
+        class M(Prodict):
+            n: int
+
+        m = M()
+        # another thread may change the annotations between two lookups
+        with mock.patch.object(M, 'attr_types', side_effect=[{'n': int}, {}]):
+            m.set_attribute('n', '1')
+        self.assertEqual(m.n, 1)
 
     def test_resolution_order_of_names(self):
         # a class attribute named like a class: the annotation means the class

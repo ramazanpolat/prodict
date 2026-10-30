@@ -59,8 +59,9 @@ except ImportError:
 _ATTR_TYPES = 'prodict:attr_types'
 _attr_types_lock = threading.RLock()
 
-# ClassVar and typing.ClassVar, bare or subscripted, written as a string
-_CLASS_VAR = re.compile(r'(?:typing\.)?ClassVar\s*(?:\[|$)')
+# ClassVar, bare or subscripted, written as a string, with what precedes it
+# (typing., an alias such as t., or nothing)
+_CLASS_VAR = re.compile(r'((?:\w+\.)*)ClassVar\s*(?:\[|$)')
 
 
 def _own_annotations(klass):
@@ -82,13 +83,31 @@ def _resolve(owner, annotation):
     return get_type_hints(holder, globalns=globalns, localns=localns)['a']
 
 
-def _is_class_var(tp):
+def _lookup(owner, dotted_name):
+    # the object a dotted name refers to in the class body of owner, or None
+    module_ns = getattr(sys.modules.get(owner.__module__), '__dict__', {})
+    first, *rest = dotted_name.split('.')
+    obj = module_ns.get(first, vars(owner).get(first))
+    for name in rest:
+        obj = getattr(obj, name, None)
+    return obj
+
+
+def _is_class_var(tp, owner=None):
     if _ANNOTATED is not None and get_origin(tp) is _ANNOTATED:
         tp = get_args(tp)[0]
     if isinstance(tp, ForwardRef):
         tp = tp.__forward_arg__
     if isinstance(tp, str):
-        return _CLASS_VAR.match(tp.strip()) is not None
+        match = _CLASS_VAR.match(tp.strip())
+        if match is None:
+            return False
+        prefix = match.group(1)
+        if prefix in ('', 'typing.'):
+            return True
+        # t.ClassVar after `import typing as t` is ClassVar; models.ClassVar,
+        # a class named ClassVar, is not
+        return owner is not None and getattr(_lookup(owner, prefix[:-1]), 'ClassVar', None) is ClassVar
     return tp is ClassVar or get_origin(tp) is ClassVar
 
 
@@ -133,7 +152,8 @@ def _retry_unresolved(types, unresolved):
 def _without_class_vars(types, unresolved):
     # ClassVar annotations are class attributes, not keys
     for name, annotation in list(types.items()):
-        if _is_class_var(annotation):
+        owner = unresolved[name][0] if name in unresolved else None
+        if _is_class_var(annotation, owner):
             del types[name]
             unresolved.pop(name, None)
     return types, unresolved
