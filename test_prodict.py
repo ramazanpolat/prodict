@@ -1,4 +1,5 @@
 import __future__
+import functools
 import gc
 import pickle
 import threading
@@ -108,9 +109,21 @@ class Counter(Prodict):
     # module level, so that pickle can find it
     n: int
     log: List[str]
+    init_calls = []
 
     def init(self):
+        Counter.init_calls.append(1)
         self.log = ['created']
+
+
+class Slotted(Prodict):
+    __slots__ = ('tag', '__secret')
+
+
+class Strict(Prodict):
+    # a subclass with its own constructor, keyword arguments only
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 
 class ForwardNode(Prodict):
@@ -814,7 +827,7 @@ class TestProdict(TestCase):
         # a plain dict for a dict attribute still becomes a Prodict
         self.assertIsInstance(M(d={'a': 1}).d, Prodict)
 
-        # deepcopy re-assigns every value, including the Prodict in d
+        # deepcopy copies every value, including the Prodict in d
         m2 = M(d={'a': {'b': 2}})
         clone = copy.deepcopy(m2)
         self.assertEqual(clone, m2)
@@ -1235,25 +1248,94 @@ class TestProdict(TestCase):
         self.assertIs(p.b, other)
         self.assertIs(Prodict({'c': other}).c, other)
 
+    def clones(self, value):
+        # every way to copy a Prodict: copy, deepcopy and pickle with each protocol
+        yield copy.copy(value)
+        yield copy.deepcopy(value)
+        for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
+            yield pickle.loads(pickle.dumps(value, protocol))
+
     def test_copy_deepcopy_and_pickle_keep_data_as_stored(self):
         c = Counter(n='1')
-        c['n'] = 'raw'  # a raw value, set without conversion
-        c.log.append('changed')
+        c['n'] = '2'        # raw, would convert to 2
+        del c['log']        # init() would put it back
         c['items'] = [1]
-        for clone in (copy.copy(c), copy.deepcopy(c), pickle.loads(pickle.dumps(c))):
-            self.assertIsInstance(clone, Counter)
-            self.assertEqual(clone, {'n': 'raw', 'log': ['created', 'changed'], 'items': [1]})
-        self.assertIs(copy.copy(c).log, c.log)
-        self.assertIsNot(copy.deepcopy(c).log, c.log)
+        c[3] = 'three'
+        calls = len(Counter.init_calls)
+        for clone in self.clones(c):
+            self.assertIs(type(clone), Counter)
+            self.assertEqual(clone, {'n': '2', 'items': [1], 3: 'three'})
+        self.assertEqual(len(Counter.init_calls), calls)
+        self.assertIs(copy.copy(c)['items'], c['items'])
+        self.assertIsNot(copy.deepcopy(c)['items'], c['items'])
+
+    def test_copies_keep_instance_attributes_and_slots(self):
+        p = Prodict(a=1)
+        vars(p)['note'] = 'kept'
+        s = Slotted(a=1)
+        object.__setattr__(s, 'tag', 'x')
+        object.__setattr__(s, '_Slotted__secret', 'y')
+        for clone in self.clones(p):
+            self.assertEqual(vars(clone), {'note': 'kept'})
+            self.assertEqual(clone, {'a': 1})
+        for clone in self.clones(s):
+            self.assertEqual((clone.tag, clone._Slotted__secret), ('x', 'y'))
+            self.assertEqual(clone, {'a': 1})
 
     def test_deepcopy_and_pickle_of_shared_and_cyclic_values(self):
         shared = Prodict(v=1)
         p = Prodict(a=shared, b=shared)
         p['me'] = p
-        for clone in (copy.deepcopy(p), pickle.loads(pickle.dumps(p))):
+        shallow, *deep = self.clones(p)
+        self.assertIs(shallow['me'], p)  # a shallow copy points at the original, as a dict's does
+        for clone in deep:
             self.assertIs(clone.a, clone.b)
             self.assertIs(clone['me'], clone)
-            self.assertIsNot(clone.a, shared)
+
+    def test_cyclic_and_shared_dicts_in_data(self):
+        d = {'name': 'loop'}
+        d['me'] = d
+        for p in (Prodict(d), Prodict.from_dict(d), Prodict(wrapper=d).wrapper):
+            self.assertIs(p.me, p)
+            self.assertEqual(p.name, 'loop')
+        shared = {'v': 1}
+        both = Prodict(a=shared, b=shared)
+        self.assertIs(both.a, both.b)
+
+    def test_from_dict_with_a_custom_constructor(self):
+        self.assertEqual(Strict.from_dict({'x': 1}), {'x': 1})
+
+        class Holder(Prodict):
+            child: Strict
+
+        self.assertIsInstance(Holder(child={'x': 1}).child, Strict)
+
+    def test_class_attributes_named_like_dict_methods(self):
+        M = type('M', (Prodict,), {'__annotations__': {'items': list}, 'items': None})
+        m = M()
+        self.assertEqual(dict(m), {'items': None})
+        self.assertEqual(m.to_dict(), {'items': None})
+        self.assertIn('to_dict', dir(m))
+
+    def test_delete_instance_attributes(self):
+        class Cached(Prodict):
+            @functools.cached_property
+            def total(self):
+                return 3
+
+        c = Cached(a=1)
+        self.assertEqual(c.total, 3)
+        del c.total  # a cached value, not a key
+        self.assertEqual(c, {'a': 1})
+
+    def test_keys_named_like_special_methods(self):
+        hooks = {'__deepcopy__': 1, '__getstate__': 2, '__reduce_ex__': 3, '__copy__': 4}
+        p = Prodict(nested={'__deepcopy__': 5}, **hooks)
+        for clone in self.clones(p):
+            self.assertEqual(clone, p)
+        self.assertEqual(p['__deepcopy__'], 1)
+        with self.assertRaises(AttributeError):
+            p.__deepcopy__  # a special-method name is never a key lookup
 
     def test_pickles_from_0_8_load(self):
         # Prodict(a=1, b={'c': 2}) pickled by prodict 0.8.23 (protocol 2)
@@ -1274,7 +1356,7 @@ class TestProdict(TestCase):
             del p.items
 
     def test_dir_lists_keys(self):
-        p = Prodict(alpha=1, **{'not-an-identifier': 2})
+        p = Prodict({'alpha': 1, 'not-an-identifier': 2, 3: 'three'})
         names = dir(p)
         self.assertIn('alpha', names)
         self.assertIn('to_dict', names)
