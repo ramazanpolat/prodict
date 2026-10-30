@@ -43,9 +43,9 @@ uv run --python 3.8 pytest                     # another interpreter (uv downloa
 for e in examples/*/main.py; do uv run python "$e"; done
 ```
 
-`uv run pytest` runs `test_prodict.py` and every `>>>` example in `docs/` (configured in
-`[tool.pytest.ini_options]`). When you change behavior, update the docs in the same change;
-the doc tests fail otherwise. Example READMEs show each example's exact output, so update
+`uv run pytest` runs `test_prodict.py` and every `>>>` example in `docs/` and `README.md`
+(configured in `[tool.pytest.ini_options]`). When you change behavior, update the docs in
+the same change; the doc tests fail otherwise. Example READMEs show each example's exact output, so update
 them along with `main.py`.
 
 CI runs the same commands on every Python version from 3.8 to 3.15.
