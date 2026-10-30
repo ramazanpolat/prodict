@@ -1,6 +1,7 @@
 # Global comments:
 # self is avoided to fix #15
 from typing import Any, ClassVar, ForwardRef, List, Union, get_args, get_origin, get_type_hints
+import copyreg
 import re
 import sys
 import threading
@@ -162,6 +163,25 @@ def _without_class_vars(types, unresolved):
     return types, unresolved
 
 
+# the dicts being converted to Prodicts in this thread, so that a dict that
+# contains itself becomes a Prodict that contains itself:
+# {(id(source dict), Prodict class): (source dict, Prodict)}
+_converting = threading.local()
+
+
+def _converted(cls, value):
+    # the Prodict of class cls that value is being converted to, or None
+    memo = getattr(_converting, 'memo', None)
+    entry = memo.get((id(value), cls)) if memo else None
+    return entry[1] if entry is not None and entry[0] is value else None
+
+
+def _from_dict(cls, value):
+    # converts a plain dict to cls, reusing a conversion already under way
+    target = _converted(cls, value)
+    return target if target is not None else cls.from_dict(value)
+
+
 def _try(constructor, value):
     try:
         return constructor(value)
@@ -191,13 +211,12 @@ def _convert(tp, value):
         # dict, Dict and Dict[K, V]: a plain dict becomes a Prodict; keys and
         # values are not converted
         if isinstance(value, dict) and not isinstance(value, Prodict):
-            # a key Prodict cannot hold as an attribute, such as 'items',
-            # keeps the dict as given
-            return _try(Prodict.from_dict, value)
+            return _try(lambda v: _from_dict(Prodict, v), value)
         return value
     if isinstance(tp, type) and origin is None and issubclass(tp, Prodict):
         if isinstance(value, dict) and not isinstance(value, tp):
-            return tp.from_dict(value)
+            # a model whose constructor fails keeps the dict as given
+            return _try(lambda v: _from_dict(tp, v), value)
         return value
     if origin is list:
         # List, List[T] and list[T]; a mapping is stored as given
@@ -253,7 +272,7 @@ def _store(prodict, key, value):
     if key in types:
         value = _convert(types[key], value)
     elif isinstance(value, dict) and not isinstance(value, Prodict):
-        value = Prodict.from_dict(value)
+        value = _from_dict(Prodict, value)
     dict.__setitem__(prodict, key, value)
 
 
@@ -274,18 +293,29 @@ class Prodict(dict):
 
         # #55, #42: the data that arrived positionally (a dict or an iterable of
         # pairs, possibly a one-shot iterator), read back from the dict itself
-        positional = {k: v for k, v in self.items() if k not in kwargs}
+        positional = {k: v for k, v in dict.items(self) if k not in kwargs}
 
         # #3: every annotated attribute exists, None until set
         for k in self.attr_types():
             dict.__setitem__(self, k, None)
 
-        # defaults first, then the data: positional values, then keyword arguments
-        self.init()
-        for k, v in positional.items():
-            _store(self, k, v)
-        for k, v in kwargs.items():
-            _store(self, k, v)
+        memo = getattr(_converting, 'memo', None)
+        outermost = memo is None
+        if outermost:
+            memo = _converting.memo = {}
+        source = args[0] if len(args) == 1 and isinstance(args[0], dict) else None
+        if source is not None:
+            memo[(id(source), type(self))] = (source, self)
+        try:
+            # defaults first, then the data: positional values, then keyword arguments
+            self.init()
+            for k, v in positional.items():
+                _store(self, k, v)
+            for k, v in kwargs.items():
+                _store(self, k, v)
+        finally:
+            if outermost:
+                del _converting.memo
 
     def init(self):
         ...
@@ -293,14 +323,40 @@ class Prodict(dict):
     def __new__(cls, *args, **kwargs):
         return super(Prodict, cls).__new__(cls, *args, **kwargs)
 
+    def __reduce__(self):
+        # copy, deepcopy and pickle (every protocol) restore the data as it is
+        # stored, without init() or conversion; the object exists before its
+        # items are restored, so a Prodict that contains itself works
+        attributes, slots = dict(vars(self)), {}
+        for klass in type(self).__mro__:
+            names = klass.__dict__.get('__slots__', ())
+            for name in (names,) if isinstance(names, str) else names:
+                if name in ('__dict__', '__weakref__'):
+                    continue
+                if name.startswith('__') and not name.endswith('__'):
+                    name = '_' + klass.__name__.lstrip('_') + name  # name mangling
+                try:
+                    slots[name] = object.__getattribute__(self, name)
+                except AttributeError:
+                    pass  # an empty slot
+        state = (attributes, slots) if attributes or slots else None
+        return copyreg.__newobj__, (type(self),), state, None, iter(dict.items(self))
+
     def __setstate__(self, state):
-        # pickle and copy restore the data as it is stored, without init() or
-        # conversion; pickles from 0.8.x carry a copy of the data as state,
-        # which is not needed
-        pass
+        # state is (instance attributes, slots); pickles from 0.8.x carry a
+        # copy of the data instead, which the items already restore
+        if isinstance(state, tuple):
+            attributes, slots = state
+            vars(self).update(attributes)
+            for name, value in slots.items():
+                object.__setattr__(self, name, value)
 
     @classmethod
     def from_dict(cls, d: dict):
+        if cls.__init__ is not Prodict.__init__ and all(isinstance(k, str) for k in d):
+            # a subclass with its own constructor gets the data as keyword
+            # arguments, as before
+            return cls(**d)
         return cls(d)
 
     @classmethod
@@ -372,6 +428,10 @@ class Prodict(dict):
             self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, v)
 
     def __getattr__(self, item):
+        if item.startswith('__') and item.endswith('__'):
+            # Python looks up protocol hooks (__deepcopy__, __getstate__, ...)
+            # as attributes: never answer those with data
+            raise AttributeError(f"{type(self).__name__!r} object has no attribute {item!r}")
         try:
             return self[item]
         except KeyError as exc:
@@ -383,14 +443,15 @@ class Prodict(dict):
     def __delattr__(self, name: str) -> None:
         if name in DICT_RESERVED_KEYS:
             raise TypeError("You cannot delete a reserved name as attribute")
-        try:
+        if name in self:
             del self[name]
-        except KeyError:
-            raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}") from None
+        else:
+            # an instance attribute, or a descriptor such as cached_property
+            super().__delattr__(name)
 
     def __dir__(self):
         # keys that work as attributes, for completion in a REPL or notebook
-        keys = [k for k in self.keys() if isinstance(k, str) and k.isidentifier()]
+        keys = [k for k in dict.keys(self) if isinstance(k, str) and k.isidentifier()]
         return sorted(set(super().__dir__()) | set(keys))
 
     def to_dict(
@@ -435,7 +496,7 @@ class Prodict(dict):
                 exclude_none_in_lists=exclude_none_in_lists,
                 convert_list_items=convert_list_items,
             )
-            for k, v in self.items()
+            for k, v in dict.items(self)
             if _none_condition(
                 v, is_recursive=is_recursive, exclude_none=exclude_none
             )

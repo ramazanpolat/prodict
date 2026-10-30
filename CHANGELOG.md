@@ -8,8 +8,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 
 ### Added
 
-- `del p.key` deletes a key, and `dir(p)` lists the keys, so a REPL or notebook can
-  complete them.
+- `del p.key` deletes a key, and `dir(p)` lists the keys that are identifiers, so a REPL
+  or notebook can complete them.
 - Issue forms for bug reports and feature requests, a pull request template, and
   `SECURITY.md`, which points to GitHub's private vulnerability reporting.
 
@@ -26,10 +26,18 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   plain dict copies.
 - A Prodict assigned to an unannotated attribute, or passed in as data, is stored as it
   is, not copied.
-- `from_dict(d)` is `cls(d)`: a positional dict, keyword arguments and `from_dict()` are
-  treated the same way.
-- `copy.deepcopy()` and `pickle` restore the data as it is stored: `init()` does not run
-  again and values are not converted again.
+- `from_dict(d)` is `cls(d)` (still `cls(**d)` for a subclass with its own `__init__`): a
+  positional dict, keyword arguments and `from_dict()` are treated the same way.
+- A dict that appears twice in the data becomes one Prodict, referenced twice, and a dict
+  that contains itself becomes a Prodict that contains itself.
+- A nested model whose constructor raises keeps its dict as given, like any other value
+  that cannot be converted.
+- `copy`, `copy.deepcopy()` and `pickle` restore the data as it is stored: `init()` does
+  not run again and values are not converted again. Instance attributes and slots are
+  kept.
+- Names of the form `__name__` are never looked up as keys by attribute access, so a key
+  such as `__deepcopy__` cannot stand in for a Python protocol hook; read it with
+  brackets.
 - `ClassVar` annotations are left out of the model: they no longer appear in every
   instance as `None`.
 - `Annotated[T, ...]` annotations convert as `T`.

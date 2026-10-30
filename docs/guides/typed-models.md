@@ -31,8 +31,9 @@ Every annotated attribute exists from the start, with the value `None` until you
 
 ## What is converted
 
-Conversion happens when a value goes through Prodict: keyword arguments to the
-constructor, `from_dict()`, attribute assignment (`p.price = ...`) and `set_attribute()`.
+Conversion happens when a value goes through Prodict: the constructor (keyword arguments
+or a positional dict), `from_dict()`, attribute assignment (`p.price = ...`) and
+`set_attribute()`.
 Plain dict operations, `p['price'] = ...` and `p.update(...)`, store the value as it is.
 
 | Annotation | Conversion | Example input | Stored value |
@@ -166,8 +167,8 @@ converted, nested dicts become Prodicts, and keyword arguments win over a positi
 
 ## Default values
 
-Override `init()` to set defaults. It runs inside the constructor before the keyword
-arguments are applied, so keyword arguments win:
+Override `init()` to set defaults. It runs inside the constructor before the data you
+pass in (keyword arguments or a positional dict) is applied, so the data wins:
 
 ```python
 >>> class Settings(Prodict):
@@ -194,6 +195,8 @@ arguments are applied, so keyword arguments win:
 - **Names of Prodict methods** (`to_dict`, `from_dict`, `init`, `set_attribute`, ...)
   can be set, but reading them with a dot still returns the method; only `p['to_dict']`
   reaches the value. Avoid them.
+- **Names like `__deepcopy__`**, with two leading and trailing underscores, belong to
+  Python's own protocols: as keys they are only reachable with brackets.
 - **Keys that are not valid identifiers** (`'1'`, `'first-name'`) cannot be reached with a
   dot, but still work with brackets or `set_attribute()`:
 

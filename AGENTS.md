@@ -53,9 +53,13 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   came in positionally, sets every annotated attribute to `None`, calls the `init()` hook
   (where subclasses set defaults), then stores the positional data and the keyword
   arguments again through `_store()`, which converts them. Keyword arguments win.
-  `from_dict(d)` is `cls(d)`.
+  `from_dict(d)` is `cls(d)`, or `cls(**d)` for a subclass with its own `__init__`. A
+  thread-local memo (`_converting`) maps each dict under conversion to its Prodict, so
+  cyclic and shared dicts stay cyclic and shared.
 - `__getattr__` / `__setattr__` / `__delattr__` map attributes to keys. A missing key
-  raises `AttributeError`. `__dir__` adds the keys that are identifiers.
+  raises `AttributeError`, and so does any `__dunder__` name, so that protocol lookups
+  (`copy.deepcopy` asks for `__deepcopy__`) never get data. `__dir__` adds the keys that
+  are identifiers.
 - `attr_types()` returns the annotations of the class and its base classes, via
   `typing.get_type_hints()`, without `ClassVar` ones. If that fails, each annotation is
   resolved on its own (`_resolve`, same name lookup order) and the ones that cannot be keep
@@ -76,9 +80,12 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
 - Unannotated plain dict values become `Prodict` instances; a Prodict is stored as it is.
 - Names of `dict` methods (`DICT_RESERVED_KEYS`) are accepted as keys in data, but
   `set_attribute()` / `__setattr__` / `__delattr__` refuse them (`TypeError`).
-- There is no `__getstate__` or `__deepcopy__`: `copy`, `deepcopy` and `pickle` use the
-  dict protocol and restore the stored data without `init()` or conversion.
-  `__setstate__` ignores the state that pickles from 0.8.x carry.
+- `__reduce__` returns the class, the instance attributes and slots, and the items, so
+  `copy`, `deepcopy` and `pickle` (every protocol) restore the stored data without
+  `init()` or conversion, and handle cycles. `__setstate__` restores attributes and slots
+  and ignores the copy of the data that pickles from 0.8.x carry.
+- Internal code calls `dict.items(self)` / `dict.keys(self)`, never `self.items()`, since a
+  subclass may define a class attribute with that name.
 - `__init__` and `set_attributes` name their first parameter
   `self_d921dfa9_4e93_4123_893d_a7e7eb783a32` so that `self` works as a key
   (`test_issue15`). Keep it that way.
