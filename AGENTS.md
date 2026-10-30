@@ -59,8 +59,9 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   `typing.get_type_hints()`, without `ClassVar` ones. If that fails, each annotation is
   resolved on its own (`_resolve`, same name lookup order) and the ones that cannot be keep
   their raw form (`annotationlib` on 3.14+); later calls retry them, so a forward reference
-  converts once its class exists. The result is stored on the class itself
-  (`_prodict_attr_types`, written under a lock). `has_attr()` is `name in attr_types()`.
+  converts once its class exists. The result is stored on the class itself, under a name
+  that is not an identifier, and written under a lock. `has_attr()` is
+  `name in attr_types()`.
 - `set_attribute()` converts values for annotated attributes with `_convert(annotation,
   value)`: `int`, `float`, `str`, `list`; `List[T]` / `list[T]` (item-wise);
   `Tuple[...]` / `tuple[...]` (to `tuple`); `dict` / `Dict[K, V]` / `dict[K, V]` and

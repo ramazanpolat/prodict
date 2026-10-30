@@ -1029,6 +1029,42 @@ class TestProdict(TestCase):
         self.assertIsInstance(module.Holder(variant={'code': '1'}).variant, module.ClassVariant)
         self.assertIs(module.Holder.attr_types()['variant'], module.ClassVariant)
 
+    def test_qualified_name_ending_in_class_var_is_a_field(self):
+        module = make_module('prodict_test_qualified_class_var', (
+            'import types\n'
+            'from prodict import Prodict\n'
+            'models = types.SimpleNamespace()\n'
+            'class Holder(Prodict):\n'
+            '    child: models.ClassVar\n'), future_annotations=True)
+        self.assertEqual(module.Holder.attr_names(), ['child'])
+        exec('class Child(Prodict):\n    pass\nmodels.ClassVar = Child\n', module.__dict__)
+        self.assertIsInstance(module.Holder(child={}).child, module.Child)
+
+    def test_internal_names_do_not_hide_keys(self):
+        p = Prodict(_prodict_attr_types=7)
+        p.attr_types()
+        self.assertEqual(p._prodict_attr_types, 7)
+
+    def test_list_item_isinstance_failure(self):
+        from typing import Protocol, runtime_checkable
+
+        @runtime_checkable
+        class Sized(Protocol):
+            @property
+            def size(self) -> int:
+                ...
+
+        class NotReady:
+            @property
+            def size(self):
+                raise ValueError('not ready')
+
+        class M(Prodict):
+            items_list: List[Sized]
+
+        item = NotReady()
+        self.assertIs(M(items_list=[item]).items_list[0], item)
+
     def test_resolution_order_of_names(self):
         # a class attribute named like a class: the annotation means the class
         # in the module, whether or not another annotation fails to resolve

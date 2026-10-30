@@ -54,12 +54,13 @@ except ImportError:
     annotationlib = None
 
 # the class attribute that holds a model's annotations, collected over its
-# class hierarchy: (annotations, {name: (owner class, annotation)} not resolved yet)
-_ATTR_TYPES = '_prodict_attr_types'
+# class hierarchy: (annotations, {name: (owner class, annotation)} not resolved yet).
+# Not an identifier, so it can never hide a key from attribute access.
+_ATTR_TYPES = 'prodict:attr_types'
 _attr_types_lock = threading.RLock()
 
-# ClassVar, typing.ClassVar[...] and the like, written as a string
-_CLASS_VAR = re.compile(r'(?:\w+\.)*ClassVar\s*(?:\[|$)')
+# ClassVar and typing.ClassVar, bare or subscripted, written as a string
+_CLASS_VAR = re.compile(r'(?:typing\.)?ClassVar\s*(?:\[|$)')
 
 
 def _own_annotations(klass):
@@ -210,7 +211,7 @@ def _convert_item(tp, item):
         try:
             if isinstance(item, tp):
                 return item
-        except TypeError:
+        except Exception:
             # a class that does not support isinstance(), such as a TypedDict
             return item
         return _try(tp, item)
@@ -337,8 +338,9 @@ class Prodict(dict):
     def set_attribute(self, attr_name, value):
         if attr_name in DICT_RESERVED_KEYS:
             raise TypeError("You cannot set a reserved name as attribute")
-        if self.has_attr(attr_name):
-            value = _convert(self.attr_type(attr_name), value)
+        types = self.attr_types()  # one snapshot for the lookup and the conversion
+        if attr_name in types:
+            value = _convert(types[attr_name], value)
         elif isinstance(value, dict):
             if isinstance(value, Prodict):
                 value = value.from_dict(value)
