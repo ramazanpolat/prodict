@@ -55,10 +55,10 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   arguments again through `_store()`, which converts them. Keyword arguments win.
   `from_dict(d)` is `cls(d)`, or `cls(**d)` when a subclass's own `__init__` accepts the
   data as keyword arguments (`_takes_keywords` binds it to the signature); it is typed to
-  return `cls`. A thread-local memo (`_converting`, keyed by the source dict's id) maps
-  each dict that `Prodict(d)` converts to its instance, so cyclic and shared dicts stay
-  cyclic and shared for models with the default constructor. `init()` runs outside the
-  memo, so defaults are never shared, and a failed instance is removed from it.
+  return `cls`. While `Prodict(d)` builds an instance it is listed, per thread, as the
+  conversion of `d` (`_converting.active`), so a reference back to `d` (a cycle) becomes
+  that instance; the entry is removed when the constructor ends, successful or not.
+  `init()` runs outside it. A dict that appears twice without a cycle is converted twice.
 - `__getattr__` / `__setattr__` / `__delattr__` map attributes to keys. A missing key
   raises `AttributeError`, and so does any `__dunder__` name (`_is_dunder`), so that
   protocol lookups (`copy.deepcopy` asks for `__deepcopy__`) never get data.

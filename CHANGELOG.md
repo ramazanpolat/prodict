@@ -31,8 +31,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 - `from_dict(d)` is `cls(d)` (still `cls(**d)` when a subclass's own `__init__` accepts
   the data as keyword arguments): a positional dict, keyword arguments and `from_dict()`
   are treated the same way.
-- A dict that appears twice in the data becomes one Prodict, referenced twice, and a dict
-  that contains itself becomes a Prodict that contains itself.
+- A dict that contains itself becomes a Prodict that contains itself, instead of raising
+  `RecursionError`.
 - A nested model whose constructor raises keeps its dict as given, like any other value
   that cannot be converted.
 - `copy`, `copy.deepcopy()` and `pickle` restore the data as it is stored: `init()` does

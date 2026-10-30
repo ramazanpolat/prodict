@@ -6,6 +6,7 @@ import inspect
 import re
 import sys
 import threading
+import types
 import typing
 
 DICT_RESERVED_KEYS = vars(dict).keys()
@@ -164,36 +165,32 @@ def _without_class_vars(types, unresolved):
     return types, unresolved
 
 
-# the dicts being converted to Prodicts in this thread, so that a dict that
-# contains itself becomes a Prodict that contains itself, and a dict that
-# appears twice becomes one Prodict: {id(source dict): (source dict, Prodict)}
+# the conversions under way in this thread, so that a dict that contains
+# itself becomes a Prodict that contains itself:
+# {id(source dict): [(source dict, Prodict being built from it), ...]}
 _converting = threading.local()
 
 
+def _active():
+    active = getattr(_converting, 'active', None)
+    if active is None:
+        active = _converting.active = {}
+    return active
+
+
 def _converted(cls, value):
-    # the instance of cls that value is being converted to, or None
-    memo = getattr(_converting, 'memo', None)
-    entry = memo.get(id(value)) if memo else None
-    if entry is not None and entry[0] is value and isinstance(entry[1], cls):
-        return entry[1]
+    # the instance of cls being built from value right now, or None
+    for source, target in reversed(_active().get(id(value), ())):
+        if source is value and isinstance(target, cls):
+            return target
     return None
 
 
 def _from_dict(cls, value):
-    # converts a plain dict to cls, reusing a conversion already under way
+    # converts a plain dict to cls; a dict that is already being converted
+    # higher up (a cycle) refers back to that instance
     target = _converted(cls, value)
-    if target is not None:
-        return target
-    try:
-        return cls.from_dict(value)
-    except BaseException:
-        # a model whose constructor failed, even after Prodict.__init__
-        # finished, is not reused for the same dict elsewhere
-        memo = getattr(_converting, 'memo', None)
-        entry = memo.get(id(value)) if memo else None
-        if entry is not None and entry[0] is value and type(entry[1]) is cls:
-            del memo[id(value)]
-        raise
+    return target if target is not None else cls.from_dict(value)
 
 
 def _is_dunder(name):
@@ -203,12 +200,16 @@ def _is_dunder(name):
 
 def _takes_keywords(cls, d):
     """
-    True if a subclass's own constructor accepts the data as keyword
-    arguments, the way from_dict() passed it before 0.9.
+    True if a subclass's own constructor wants the data as keyword arguments,
+    the way from_dict() passed it before 0.9: it has no *args, and the data
+    binds to its signature.
     """
     options = {'annotation_format': annotationlib.Format.STRING} if annotationlib is not None else {}
     try:
-        inspect.signature(cls.__init__, **options).bind(None, **d)
+        signature = inspect.signature(cls.__init__, **options)
+        if any(p.kind is p.VAR_POSITIONAL for p in signature.parameters.values()):
+            return False
+        signature.bind(None, **d)
     except Exception:
         return False
     return True
@@ -217,8 +218,6 @@ def _takes_keywords(cls, d):
 def _try(constructor, value):
     try:
         return constructor(value)
-    except RecursionError:
-        raise
     except Exception:
         # the value cannot be converted: store it as given
         return value
@@ -336,36 +335,31 @@ class Prodict(dict):
         for k in self.attr_types():
             dict.__setitem__(self, k, None)
 
-        # a dict that contains itself, or appears twice, converts to one
-        # Prodict: remember which source dict this instance is made from
-        memo = getattr(_converting, 'memo', None)
-        outermost = memo is None
-        if outermost:
-            memo = _converting.memo = {}
+        # while this instance is being built from a dict, a reference back to
+        # that dict (a cycle) converts to this instance
         source = args[0] if len(args) == 1 and isinstance(args[0], dict) and not kwargs else None
+        active = _active()
+        if source is not None:
+            active.setdefault(id(source), []).append((source, self))
         try:
-            if source is not None:
-                memo[id(source)] = (source, self)
             # defaults first, each instance its own: init() runs outside the
             # conversions under way
-            _converting.memo = None
+            _converting.active = {}
             try:
                 self.init()
             finally:
-                _converting.memo = memo
+                _converting.active = active
             # then the data: positional values, then keyword arguments
             for k, v in positional.items():
                 _store(self, k, v)
             for k, v in kwargs.items():
                 _store(self, k, v)
-        except BaseException:
-            # a failed instance is not reused for the same dict elsewhere
-            if source is not None and memo.get(id(source), (None, None))[1] is self:
-                del memo[id(source)]
-            raise
         finally:
-            if outermost:
-                del _converting.memo
+            if source is not None:
+                entries = active[id(source)]
+                entries[:] = [entry for entry in entries if entry[1] is not self]
+                if not entries:
+                    del active[id(source)]
 
     def init(self):
         ...
@@ -511,14 +505,17 @@ class Prodict(dict):
         if _is_dunder(name) or name in vars(self):
             # an instance attribute, such as a cached_property value
             super().__delattr__(name)
-        elif hasattr(type(inspect.getattr_static(type(self), name, None)), '__delete__'):
-            # a descriptor that may delete: a property deleter, a filled slot
+        elif isinstance(inspect.getattr_static(type(self), name, None), types.MemberDescriptorType):
+            # a slot: delete its value, or the key of that name if it is empty
             try:
                 super().__delattr__(name)
             except AttributeError:
                 if name not in self:
                     raise
                 del self[name]
+        elif hasattr(type(inspect.getattr_static(type(self), name, None)), '__delete__'):
+            # a descriptor such as a property: its own deleter decides
+            super().__delattr__(name)
         elif name in self:
             del self[name]
         else:
