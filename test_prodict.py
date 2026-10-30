@@ -1,12 +1,16 @@
 import __future__
+import gc
 import pickle
+import threading
+import weakref
 import sys
 import types
 from decimal import Decimal
 from unittest import TestCase
-from typing import List, Any, Tuple, Dict, Optional, Union
+from typing import List, Any, Tuple, Dict, Optional, Union, TypedDict
 import unittest
 from datetime import datetime
+import prodict
 from prodict import Prodict
 import copy
 
@@ -859,6 +863,9 @@ class TestProdict(TestCase):
             '    either: int | str\n'))
         self.assertEqual(module.M(n='7').n, 7)
         self.assertEqual(module.M(either='7').either, '7')
+        self.assertIs(type(module.M(either=7).either), int)
+        data = {'a': 1}
+        self.assertIs(module.M(either=data).either, data)
 
     @unittest.skipIf(sys.version_info < (3, 9), 'built-in generics need Python 3.9')
     def test_builtin_generic_annotations(self):
@@ -913,9 +920,33 @@ class TestProdict(TestCase):
         self.assertIs(m.anything[1], ram)
         self.assertEqual(m.anything[2:], ['1', None])
         self.assertEqual(m.pairs, [(1, 2)])
-        self.assertEqual(m.flags, [False, True])
+        self.assertIs(m.flags[0], False)
+        self.assertIs(m.flags[1], True)
         self.assertEqual(m.amounts, [Decimal('1.5')])
         self.assertIsInstance(m.dicts[0], Prodict)
+
+    def test_list_items_that_cannot_be_converted(self):
+        class TD(TypedDict):
+            a: int
+
+        class M(Prodict):
+            amounts: List[Decimal]
+            maybe_amounts: List[Optional[Decimal]]
+            typed: List[TD]
+
+        item = {'a': 1}
+        m = M(amounts=['1.5', 'bad'], maybe_amounts=['2.5', None], typed=[item])
+        self.assertEqual(m.amounts, [Decimal('1.5'), 'bad'])
+        self.assertEqual(m.maybe_amounts, [Decimal('2.5'), None])
+        self.assertIsInstance(m.maybe_amounts[0], Decimal)
+        self.assertIs(m.typed[0], item)
+
+    @unittest.skipIf(sys.version_info < (3, 9), 'Annotated needs Python 3.9')
+    def test_annotated_is_converted_as_its_type(self):
+        from typing import Annotated
+        # get_type_hints() strips Annotated; _convert handles it when it does not
+        self.assertEqual(prodict._convert(Annotated[int, 'meta'], '7'), 7)
+        self.assertEqual(prodict._convert_item(Annotated[Decimal, 'meta'], '1.5'), Decimal('1.5'))
 
     def test_annotations_are_inherited(self):
         class Base(Prodict):
@@ -987,6 +1018,68 @@ class TestProdict(TestCase):
         owner = module.Owner(pet={'name': 'Rex'}, age='3')
         self.assertIsInstance(owner.pet, module.Pet)
         self.assertEqual(owner.age, 3)
+
+    def test_forward_reference_named_like_class_var(self):
+        module = make_module('prodict_test_class_var_name', (
+            'from prodict import Prodict\n'
+            'class Holder(Prodict):\n'
+            '    variant: ClassVariant\n'), future_annotations=True)
+        self.assertEqual(module.Holder.attr_names(), ['variant'])
+        exec('class ClassVariant(Prodict):\n    code: int\n', module.__dict__)
+        self.assertIsInstance(module.Holder(variant={'code': '1'}).variant, module.ClassVariant)
+        self.assertIs(module.Holder.attr_types()['variant'], module.ClassVariant)
+
+    def test_resolution_order_of_names(self):
+        # a class attribute named like a class: the annotation means the class
+        # in the module, whether or not another annotation fails to resolve
+        module = make_module('prodict_test_names', (
+            'from prodict import Prodict\n'
+            'class Pet(Prodict):\n'
+            '    name: str\n'
+            'class Owner(Prodict):\n'
+            '    Pet: Pet = None\n'
+            'class BrokenOwner(Prodict):\n'
+            '    Pet: Pet = None\n'
+            '    other: Missing\n'), future_annotations=True)
+        self.assertIs(module.Owner.attr_types()['Pet'], module.Pet)
+        self.assertIs(module.BrokenOwner.attr_types()['Pet'], module.Pet)
+
+    def test_forward_reference_from_threads(self):
+        module = make_module('prodict_test_threads', (
+            'from prodict import Prodict\n'
+            'class Owner(Prodict):\n'
+            '    pet: Pet\n'), future_annotations=True)
+        module.Owner()
+        exec('class Pet(Prodict):\n    name: str\n', module.__dict__)
+        barrier, results, errors = threading.Barrier(8), [], []
+
+        def work():
+            barrier.wait()
+            try:
+                results.append(type(module.Owner(pet={'name': 'Rex'}).pet))
+            except Exception as error:  # pragma: no cover
+                errors.append(error)
+
+        threads = [threading.Thread(target=work) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(errors, [])
+        self.assertEqual(results, [module.Pet] * 8)
+
+    def test_models_can_be_garbage_collected(self):
+        def make():
+            class Node(Prodict):
+                parent: 'Node'
+                value: int
+
+            Node(value='1', parent={'value': '2'})
+            return weakref.ref(Node)
+
+        ref = make()
+        gc.collect()
+        self.assertIsNone(ref())
 
     @unittest.skipIf(sys.version_info < (3, 14), 'lazy annotations need Python 3.14')
     def test_lazy_annotations(self):

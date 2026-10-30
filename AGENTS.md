@@ -56,10 +56,11 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
 - `__getattr__` / `__setattr__` map attributes to keys. A missing key raises
   `AttributeError`.
 - `attr_types()` returns the annotations of the class and its base classes, via
-  `typing.get_type_hints()`, without `ClassVar` ones; cached per class. If that fails, each
-  annotation is resolved on its own (`_resolve`) and the ones that cannot be keep their raw
-  form (`annotationlib` on 3.14+); `attr_type()` retries those, so a forward reference
-  converts once its class exists. `has_attr()` is `name in attr_types()`.
+  `typing.get_type_hints()`, without `ClassVar` ones. If that fails, each annotation is
+  resolved on its own (`_resolve`, same name lookup order) and the ones that cannot be keep
+  their raw form (`annotationlib` on 3.14+); later calls retry them, so a forward reference
+  converts once its class exists. The result is stored on the class itself
+  (`_prodict_attr_types`, written under a lock). `has_attr()` is `name in attr_types()`.
 - `set_attribute()` converts values for annotated attributes with `_convert(annotation,
   value)`: `int`, `float`, `str`, `list`; `List[T]` / `list[T]` (item-wise);
   `Tuple[...]` / `tuple[...]` (to `tuple`); `dict` / `Dict[K, V]` / `dict[K, V]` and
@@ -67,8 +68,8 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   already is an instance); `Optional[T]` / `T | None` / `Annotated[T, ...]` (as `T`).
   `List[T]` items go through `T` for any class `T` (`_convert_item`). Anything else (`Any`,
   `bool`, plain `tuple`, multi-type unions, unresolved strings) is stored as given, and so
-  is a value whose conversion fails (`TypeError`, `ValueError`, `OverflowError`): an
-  annotation never makes an assignment fail. `None` is never converted.
+  is a value whose conversion call raises: an annotation never makes an assignment
+  fail. `None` is never converted.
   `p['key'] = ...` and `update()` are plain dict operations and bypass conversion.
 - Unannotated dict values become `Prodict` instances.
 - Names of `dict` methods (`DICT_RESERVED_KEYS`) cannot be set as attributes (`TypeError`).
