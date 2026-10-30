@@ -1324,6 +1324,7 @@ class TestProdict(TestCase):
         shared = {'v': 1}
         both = Prodict(a=shared, b=shared)
         self.assertEqual(both.a, both.b)  # converted once per occurrence, as before
+        self.assertIsNot(both.a, both.b)
 
     def test_from_dict_with_a_custom_constructor(self):
         self.assertEqual(Strict.from_dict({'x': 1}), {'x': 1})
@@ -1606,6 +1607,17 @@ class TestProdict(TestCase):
                 super().__init__(*args, **kwargs)
 
         self.assertEqual(Flexible.from_dict({'cls': 1}), {'cls': 1})
+
+        class NamedFirst(Prodict):
+            def __init__(self, name, *args, **kwargs):
+                super().__init__(*args, name=name, **kwargs)
+
+        class KeywordAfterArgs(Prodict):
+            def __init__(self, *args, name, **kwargs):
+                super().__init__(*args, name=name, **kwargs)
+
+        self.assertEqual(NamedFirst.from_dict({'name': 'Ada', 'age': 30}), {'name': 'Ada', 'age': 30})
+        self.assertEqual(KeywordAfterArgs.from_dict({'name': 'Ada'}), {'name': 'Ada'})
         self.assertEqual(Flexible.from_dict({'self': 2}), {'self': 2})
 
     def test_delete_a_read_only_property(self):
