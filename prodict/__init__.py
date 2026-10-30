@@ -2,6 +2,7 @@
 # self is avoided to fix #15
 from typing import Any, ClassVar, ForwardRef, List, Union, get_args, get_origin, get_type_hints
 import copyreg
+import inspect
 import re
 import sys
 import threading
@@ -182,6 +183,31 @@ def _from_dict(cls, value):
     return target if target is not None else cls.from_dict(value)
 
 
+def _is_dunder(name):
+    # __name__ style: the names Python uses for its own protocols
+    return isinstance(name, str) and len(name) > 4 and name.startswith('__') and name.endswith('__')
+
+
+def _takes_keywords(init):
+    """
+    True if a custom __init__ expects the data as keyword arguments, as
+    from_dict() passed it before 0.9: it takes **kwargs, and neither *args
+    nor a required positional parameter.
+    """
+    try:
+        parameters = list(inspect.signature(init).parameters.values())[1:]
+    except (TypeError, ValueError):
+        return False
+    kinds = {parameter.kind for parameter in parameters}
+    required_positional = any(
+        parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+        and parameter.default is parameter.empty
+        for parameter in parameters
+    )
+    return (inspect.Parameter.VAR_KEYWORD in kinds and inspect.Parameter.VAR_POSITIONAL not in kinds
+            and not required_positional)
+
+
 def _try(constructor, value):
     try:
         return constructor(value)
@@ -299,20 +325,42 @@ class Prodict(dict):
         for k in self.attr_types():
             dict.__setitem__(self, k, None)
 
+        # a dict that contains itself, or appears twice, converts to one
+        # Prodict: remember which source dict this instance is made from
         memo = getattr(_converting, 'memo', None)
         outermost = memo is None
         if outermost:
             memo = _converting.memo = {}
-        source = args[0] if len(args) == 1 and isinstance(args[0], dict) else None
-        if source is not None:
-            memo[(id(source), type(self))] = (source, self)
+        key = None
         try:
-            # defaults first, then the data: positional values, then keyword arguments
-            self.init()
+            pending = getattr(_converting, 'pending', None)
+            if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
+                source = args[0]
+            elif pending is not None and pending[0] is type(self):
+                source = pending[1]  # from_dict() called cls(**d)
+                _converting.pending = None
+            else:
+                source = None
+            if source is not None:
+                key = (id(source), type(self))
+                memo[key] = (source, self)
+            # defaults first, each instance its own: init() does not see the
+            # conversions under way
+            _converting.memo = {}
+            try:
+                self.init()
+            finally:
+                _converting.memo = memo
+            # then the data: positional values, then keyword arguments
             for k, v in positional.items():
                 _store(self, k, v)
             for k, v in kwargs.items():
                 _store(self, k, v)
+        except BaseException:
+            # a failed instance is not reused for the same dict elsewhere
+            if key is not None and memo.get(key, (None, None))[1] is self:
+                del memo[key]
+            raise
         finally:
             if outermost:
                 del _converting.memo
@@ -327,20 +375,34 @@ class Prodict(dict):
         # copy, deepcopy and pickle (every protocol) restore the data as it is
         # stored, without init() or conversion; the object exists before its
         # items are restored, so a Prodict that contains itself works
-        attributes, slots = dict(vars(self)), {}
-        for klass in type(self).__mro__:
-            names = klass.__dict__.get('__slots__', ())
-            for name in (names,) if isinstance(names, str) else names:
-                if name in ('__dict__', '__weakref__'):
-                    continue
-                if name.startswith('__') and not name.endswith('__'):
-                    name = '_' + klass.__name__.lstrip('_') + name  # name mangling
-                try:
-                    slots[name] = object.__getattribute__(self, name)
-                except AttributeError:
-                    pass  # an empty slot
-        state = (attributes, slots) if attributes or slots else None
-        return copyreg.__newobj__, (type(self),), state, None, iter(dict.items(self))
+        cls = type(self)
+        if hasattr(cls, '__getnewargs_ex__'):
+            args, kwargs = self.__getnewargs_ex__()
+            new = copyreg.__newobj_ex__, (cls, tuple(args), dict(kwargs))
+        elif hasattr(cls, '__getnewargs__'):
+            new = copyreg.__newobj__, (cls,) + tuple(self.__getnewargs__())
+        else:
+            new = copyreg.__newobj__, (cls,)
+        if getattr(cls, '__getstate__', None) not in (None, getattr(object, '__getstate__', None)):
+            # a subclass's own __getstate__ decides what is saved
+            state = self.__getstate__()
+            if cls.__setstate__ is Prodict.__setstate__ and isinstance(state, dict):
+                state = (state, {})
+        else:
+            attributes, slots = dict(vars(self)), {}
+            for klass in cls.__mro__:
+                names = klass.__dict__.get('__slots__', ())
+                for name in (names,) if isinstance(names, str) else names:
+                    if name in ('__dict__', '__weakref__'):
+                        continue
+                    if name.startswith('__') and not name.endswith('__') and klass.__name__.lstrip('_'):
+                        name = '_' + klass.__name__.lstrip('_') + name  # name mangling
+                    try:
+                        slots[name] = object.__getattribute__(self, name)
+                    except AttributeError:
+                        pass  # an empty slot
+            state = (attributes, slots) if attributes or slots else None
+        return new + (state, None, iter(dict.items(self)))
 
     def __setstate__(self, state):
         # state is (instance attributes, slots); pickles from 0.8.x carry a
@@ -353,10 +415,15 @@ class Prodict(dict):
 
     @classmethod
     def from_dict(cls, d: dict):
-        if cls.__init__ is not Prodict.__init__ and all(isinstance(k, str) for k in d):
-            # a subclass with its own constructor gets the data as keyword
-            # arguments, as before
-            return cls(**d)
+        if (cls.__init__ is not Prodict.__init__ and _takes_keywords(cls.__init__)
+                and all(isinstance(k, str) for k in d)):
+            # a subclass whose own constructor takes only keyword arguments
+            # gets the data that way, as before 0.9
+            _converting.pending = (cls, d)
+            try:
+                return cls(**d)
+            finally:
+                _converting.pending = None
         return cls(d)
 
     @classmethod
@@ -428,7 +495,7 @@ class Prodict(dict):
             self_d921dfa9_4e93_4123_893d_a7e7eb783a32.set_attribute(k, v)
 
     def __getattr__(self, item):
-        if item.startswith('__') and item.endswith('__'):
+        if _is_dunder(item):
             # Python looks up protocol hooks (__deepcopy__, __getstate__, ...)
             # as attributes: never answer those with data
             raise AttributeError(f"{type(self).__name__!r} object has no attribute {item!r}")
@@ -443,15 +510,19 @@ class Prodict(dict):
     def __delattr__(self, name: str) -> None:
         if name in DICT_RESERVED_KEYS:
             raise TypeError("You cannot delete a reserved name as attribute")
-        if name in self:
+        descriptor = getattr(type(self), name, None)
+        if _is_dunder(name) or name in vars(self) or hasattr(type(descriptor), '__delete__'):
+            # an instance attribute, such as a cached_property value, or a
+            # descriptor that can be deleted
+            super().__delattr__(name)
+        elif name in self:
             del self[name]
         else:
-            # an instance attribute, or a descriptor such as cached_property
             super().__delattr__(name)
 
     def __dir__(self):
         # keys that work as attributes, for completion in a REPL or notebook
-        keys = [k for k in dict.keys(self) if isinstance(k, str) and k.isidentifier()]
+        keys = [k for k in dict.keys(self) if isinstance(k, str) and k.isidentifier() and not _is_dunder(k)]
         return sorted(set(super().__dir__()) | set(keys))
 
     def to_dict(
