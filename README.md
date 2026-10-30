@@ -5,45 +5,74 @@
 [![CI](https://github.com/ramazanpolat/prodict/actions/workflows/pythonapp.yml/badge.svg?branch=master)](https://github.com/ramazanpolat/prodict/actions/workflows/pythonapp.yml)
 [![License: MIT](https://img.shields.io/github/license/ramazanpolat/prodict)](https://github.com/ramazanpolat/prodict/blob/master/LICENSE.txt)
 
-**A Python `dict` you can also use with dots.** Annotate a subclass, and Prodict converts
-the values and your IDE completes the names. It stays a real `dict` that never refuses
-data.
+**Prodict is what Python's `dict` meant to be: keys you can reach with dots, values typed
+by your annotations, and your IDE completing every name.** It is still a real `dict`, and
+it never refuses data.
+
+```python
+>>> from prodict import Prodict
+
+>>> p = Prodict.from_dict({'package': 'Prodict', 'rocks': {'even': 'more!'}})
+>>> p.package, p.rocks.even
+('Prodict', 'more!')
+
+```
+
+Declare the shape you care about, and values arrive with the right types:
 
 ```python
 >>> from typing import List
->>> from prodict import Prodict
 
->>> class Comment(Prodict):
-...     user_id: int
-...     text: str
+>>> class Line(Prodict):
+...     product: str
+...     price: float
+...     quantity: int
 
->>> class Post(Prodict):
-...     title: str
-...     comments: List[Comment]
+>>> class Order(Prodict):
+...     id: int
+...     lines: List[Line]
+...
+...     def total(self):
+...         return sum(line.price * line.quantity for line in self.lines)
 
->>> post = Post.from_dict({'title': 'Hello', 'comments': [{'user_id': '2', 'text': 'Welcome!'}]})
->>> post.comments[0].user_id   # an int now, and your IDE completed every name on the way
-2
->>> post                       # still a dict
-{'title': 'Hello', 'comments': [{'user_id': 2, 'text': 'Welcome!'}]}
+>>> order = Order.from_dict({
+...     'id': '1001',
+...     'lines': [{'product': 'pen', 'price': '1.50', 'quantity': '4'},
+...               {'product': 'ink', 'price': 3.25, 'quantity': 2}],
+... })
+>>> order.id, order.lines[0].quantity, order.total()   # strings became numbers
+(1001, 4, 12.5)
+>>> order.lines[1]                                      # and it is still a dict
+{'product': 'ink', 'price': 3.25, 'quantity': 2}
 
 ```
 
 ## Why Prodict
 
-- `data.user.address.city` reads better than `data['user']['address']['city']`, and is
-  harder to get wrong.
-- JSON from a web service becomes objects you can navigate, with the types you declared,
-  in one call.
-- Declared attributes give you auto-completion and type hints in your IDE.
+- `order.customer.address.city` reads better than `order['customer']['address']['city']`,
+  and your IDE completes it as you type.
+- JSON from an API or a config file becomes objects you can navigate, in one call.
+- Annotations turn `'42'` into `42` and nested dicts into your own classes, methods and
+  all.
 - It is a real `dict`: `json.dumps`, `==`, `**kwargs`, `isinstance(p, dict)` and every
   dict method keep working.
-- It is lenient. Annotations convert what they can, a value they cannot convert is stored
-  as it is, and keys you did not declare are welcome. Unexpected data never raises.
+- It is lenient. A value it cannot convert is stored as it is, keys you did not declare
+  are kept, and unexpected data never raises.
+- It is small: one module, no dependencies.
 
-Prodict does not validate. If bad input should be rejected with an error, use a
-validation library such as [pydantic](https://docs.pydantic.dev/). If you do not need a
-dict, a [dataclass](https://docs.python.org/3/library/dataclasses.html) is simpler.
+| | `dict` | dataclass | pydantic model | **Prodict** |
+|---|---|---|---|---|
+| Is a `dict` (`json.dumps`, `**data`) | yes | no | no | **yes** |
+| Dot access | no | yes | yes | **yes** |
+| Nested data becomes your classes | no | no | yes | **yes** |
+| `'42'` becomes `42` for an `int` field | no | no | yes | **yes** |
+| Undeclared keys are kept | yes | no | if configured | **yes** |
+| Bad data raises an error | no | no | yes | **no, it is kept** |
+| Dependencies | none | none | a few | **none** |
+
+If bad input should be rejected with an error, use a validation library such as
+[pydantic](https://docs.pydantic.dev/). If you do not need a dict, a
+[dataclass](https://docs.python.org/3/library/dataclasses.html) is simpler.
 
 ## Installation
 
@@ -53,64 +82,63 @@ pip install prodict
 uv add prodict
 ```
 
-No dependencies. Requires Python 3.8 or later; tested on 3.8 through 3.15. Upgrading from
-0.8? Conversion became lenient in 0.9; the
-[changelog](https://github.com/ramazanpolat/prodict/blob/master/CHANGELOG.md) lists what
-changed.
+Python 3.8 or later; tested on 3.8 through 3.15.
 
 ## Quick tour
 
-### Dot access
-
-Keys are attributes and attributes are keys.
+### Keys are attributes
 
 ```python
 >>> p = Prodict(lang='Python', pros='Rocks!')
 >>> p.lang
 'Python'
->>> p.year = 1991
->>> del p.pros
+>>> p.year = 1991             # a new attribute is a new key
 >>> p
-{'lang': 'Python', 'year': 1991}
->>> isinstance(p, dict)
+{'lang': 'Python', 'pros': 'Rocks!', 'year': 1991}
+>>> del p.year
+>>> p == {'lang': 'Python', 'pros': 'Rocks!'}
 True
 
 ```
 
+A missing attribute raises `AttributeError`, so `getattr(p, 'name', default)` and
+`hasattr()` behave as usual.
+
 ### Nested dicts become Prodicts
 
-At every level, however the data comes in: `from_dict()`, a positional dict, or keyword
-arguments.
+At every level, whether the data comes in through `from_dict()`, as a positional dict or
+as keyword arguments:
 
 ```python
->>> p = Prodict.from_dict({'package': 'Prodict', 'rock': {'even': 'more!'}})
->>> p.rock.even
-'more!'
->>> Prodict({'rock': {'even': 'more!'}}).rock.even
-'more!'
+>>> config = Prodict({'db': {'host': 'localhost', 'port': 5432}})
+>>> config.db.host
+'localhost'
+>>> config.db.port = 6432
+>>> config
+{'db': {'host': 'localhost', 'port': 6432}}
 
 ```
 
 ### Typed attributes
 
-Subclass `Prodict` and annotate. Every annotated attribute exists from the start, as
-`None` until set, and values are converted when they come in.
+Subclass `Prodict` and annotate. Every annotated attribute exists from the start, `None`
+until set, and values are converted on the way in.
 
 ```python
->>> from typing import Any, Optional
+>>> from typing import Optional
 
->>> class Country(Prodict):
-...     name: str
-...     population: int
-...     capital: Optional[str]
-...     raw: Any
+>>> class Book(Prodict):
+...     title: str
+...     year: int
+...     price: float
+...     isbn: Optional[str]
 
->>> Country(name='Turkey')
-{'name': 'Turkey', 'population': None, 'capital': None, 'raw': None}
->>> germany = Country(name='Germany', population='83200000', raw='83200000')
->>> germany.population, germany.raw
-(83200000, '83200000')
->>> Country(population='unknown').population   # cannot be converted: stored as given
+>>> Book(title='Dune')
+{'title': 'Dune', 'year': None, 'price': None, 'isbn': None}
+>>> dune = Book(title='Dune', year='1965', price='9.99')
+>>> dune.year + 1, dune.price
+(1966, 9.99)
+>>> Book(year='unknown').year       # cannot be converted: kept as given
 'unknown'
 
 ```
@@ -136,33 +164,11 @@ and `p['key'] = ...` and `update()` store values unchanged, as in any dict. The
 [typed models guide](https://github.com/ramazanpolat/prodict/blob/master/docs/guides/typed-models.md)
 has the details.
 
-### Nested models
+### Defaults and inheritance
 
-Attributes annotated with a Prodict subclass, or `List[...]` of one, turn plain dicts into
-instances of that class, methods included.
-
-```python
->>> class Ram(Prodict):
-...     capacity: int
-...     unit: str
-
->>> class Computer(Prodict):
-...     name: str
-...     rams: List[Ram]
-...
-...     def total_ram(self):
-...         return sum(ram.capacity for ram in self.rams)
-
->>> computer = Computer.from_dict({'name': 'Workstation', 'rams': [{'capacity': '16', 'unit': 'GB'}]})
->>> type(computer.rams[0]).__name__, computer.total_ram()
-('Ram', 16)
-
-```
-
-### Inheritance and defaults
-
-A subclass has its base classes' attributes. Override `init()`, not `__init__`, to set
-defaults: no `super()` call is needed, and the data you pass in wins over them.
+Override `init()`, not `__init__`, to set defaults: no `super()` call is needed, and the
+data you pass in wins over them. A subclass has its base classes' attributes and
+defaults.
 
 ```python
 >>> class Settings(Prodict):
@@ -176,8 +182,8 @@ defaults: no `super()` call is needed, and the data you pass in wins over them.
 >>> class ServerSettings(Settings):
 ...     host: str
 
->>> ServerSettings(retries='5', host='example.com')
-{'retries': 5, 'host': 'example.com', 'timeout': 10.0}
+>>> ServerSettings(host='example.com', retries='5')
+{'host': 'example.com', 'retries': 5, 'timeout': 10.0}
 
 ```
 
@@ -185,12 +191,12 @@ defaults: no `super()` call is needed, and the data you pass in wins over them.
 
 ```python
 >>> import json
->>> json.dumps(Country(name='Turkey'))
-'{"name": "Turkey", "population": null, "capital": null, "raw": null}'
->>> Country(name='Turkey').to_dict(exclude_none=True)
-{'name': 'Turkey'}
+>>> json.dumps(dune)
+'{"title": "Dune", "year": 1965, "price": 9.99, "isbn": null}'
+>>> dune.to_dict(exclude_none=True)
+{'title': 'Dune', 'year': 1965, 'price': 9.99}
 >>> page = Prodict.from_dict({'items': [1, 2], 'total': 2})
->>> page['items'], page.total   # names of dict methods are fine as keys
+>>> page['items'], page.total      # names of dict methods are fine as keys
 ([1, 2], 2)
 
 ```
@@ -198,83 +204,43 @@ defaults: no `super()` call is needed, and the data you pass in wins over them.
 `copy.copy`, `copy.deepcopy` and `pickle` keep the model class and the data as it is.
 `dir(p)` lists the keys, so a REPL or notebook completes them too.
 
-## A complete example
+## A real API in a few lines
 
-Suppose `https://example.com/api/users/1` returns:
-
-```json
-{
-  "user_id": 1,
-  "user_name": "rambo",
-  "posts": [
-    {
-      "title": "Hello World",
-      "date": "2018-01-02 03:04:05",
-      "comments": [
-        {"user_id": 2, "comment": "Good to see you blogging", "date": "2018-01-02 03:04:06"}
-      ]
-    }
-  ]
-}
-```
-
-Without Prodict, you write the classes and the mapping by hand:
+Declare only the fields you use; everything else in the response is kept and reachable
+too. This runs as is against the GitHub API:
 
 ```python
-class Comment:
-    def __init__(self, user_id, comment, date):
-        self.user_id = user_id
-        self.comment = comment
-        self.date = date
+import json
+from typing import List, Optional
 
-class Post:
-    def __init__(self, title, date, comments):
-        self.title = title
-        self.date = date
-        self.comments = comments
+import requests
+from prodict import Prodict
 
-class User:
-    def __init__(self, user_id, user_name, posts):
-        self.user_id = user_id
-        self.user_name = user_name
-        self.posts = posts
+class Owner(Prodict):
+    login: str
 
-data = requests.get('https://example.com/api/users/1').json()
-user = User(
-    data['user_id'],
-    data['user_name'],
-    [
-        Post(p['title'], p['date'], [Comment(c['user_id'], c['comment'], c['date']) for c in p['comments']])
-        for p in data['posts']
-    ],
-)
+class License(Prodict):
+    spdx_id: str
+
+class Repo(Prodict):
+    full_name: str
+    stargazers_count: int
+    owner: Owner
+    license: Optional[License]
+    topics: List[str]
+
+repo = Repo.from_dict(requests.get('https://api.github.com/repos/ramazanpolat/prodict').json())
+repo.owner.login        # 'ramazanpolat', and your IDE completed it
+repo.license.spdx_id    # 'MIT'
+repo.description        # not declared, still there
+repo.owner.html_url     # undeclared nested fields too
+json.dumps(repo)        # the original JSON, unchanged
 ```
 
-With Prodict, you declare the shape and let it do the rest:
-
-```python
-class Comment(Prodict):
-    user_id: int
-    comment: str
-    date: str
-
-class Post(Prodict):
-    title: str
-    date: str
-    comments: List[Comment]
-
-class User(Prodict):
-    user_id: int
-    user_name: str
-    posts: List[Post]
-
-user = User.from_dict(requests.get('https://example.com/api/users/1').json())
-user.posts[0].comments[0].comment   # 'Good to see you blogging'
-json.dumps(user)                    # back to JSON
-```
-
-Fields the API adds later are kept too, and reachable by dot. A runnable version is
-[examples/05-json-api-client](https://github.com/ramazanpolat/prodict/tree/master/examples/05-json-api-client).
+Without Prodict, the same reads are `data['owner']['login']` and
+`data['license']['spdx_id'] if data['license'] else None`, with no completion and no
+types. A runnable program that reads JSON into typed models, computes with them and writes
+JSON back is [examples/05-json-api-client](https://github.com/ramazanpolat/prodict/tree/master/examples/05-json-api-client).
 
 ## Good to know
 
@@ -287,6 +253,21 @@ Fields the API adds later are kept too, and reachable by dot. A runnable version
 - Dicts inside a list stay dicts unless the list is annotated (`List[Model]`).
 - Data lives in the dict, not in instance attributes: set defaults in `init()`, not as
   class attributes, and annotate class-level settings with `ClassVar`.
+
+## Upgrading from 0.8
+
+0.9 makes Prodict lenient and more dict-like. What you may notice:
+
+- A value that cannot be converted is stored as given instead of raising `ValueError`.
+- `Optional[T]`, `T | None`, built-in generics (`list[int]`) and string annotations
+  work, and a subclass inherits its base classes' annotations.
+- `Model({...})` works like `Model.from_dict({...})`, nested dicts included, and keys
+  such as `items` work in data.
+- A Prodict you pass in is stored as it is, not copied; `deepcopy` and `pickle` no longer
+  run `init()` or convert values again.
+
+The [changelog](https://github.com/ramazanpolat/prodict/blob/master/CHANGELOG.md) lists
+every change.
 
 ## Documentation
 
