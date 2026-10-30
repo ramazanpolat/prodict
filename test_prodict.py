@@ -1071,6 +1071,18 @@ class TestProdict(TestCase):
         self.assertEqual(module.M.attr_names(), ['n'])
         self.assertEqual(module.M(n='2'), {'n': 2})
 
+    def test_class_var_lookup_that_raises(self):
+        module = make_module('prodict_test_lazy_lookup', (
+            'from prodict import Prodict\n'
+            'class Lazy:\n'
+            '    def __getattr__(self, name):\n'
+            '        raise RuntimeError("not loaded")\n'
+            'lazy = Lazy()\n'
+            'class M(Prodict):\n'
+            '    x: lazy.ClassVar\n'
+            '    n: int\n'), future_annotations=True)
+        self.assertEqual(module.M(x='raw', n='2'), {'x': 'raw', 'n': 2})
+
     def test_assignment_uses_one_annotation_snapshot(self):
         class M(Prodict):
             n: int

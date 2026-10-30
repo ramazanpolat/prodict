@@ -87,9 +87,13 @@ def _lookup(owner, dotted_name):
     # the object a dotted name refers to in the class body of owner, or None
     module_ns = getattr(sys.modules.get(owner.__module__), '__dict__', {})
     first, *rest = dotted_name.split('.')
-    obj = module_ns.get(first, vars(owner).get(first))
-    for name in rest:
-        obj = getattr(obj, name, None)
+    try:
+        obj = module_ns.get(first, vars(owner).get(first))
+        for name in rest:
+            obj = getattr(obj, name, None)
+    except Exception:
+        # a lazy module or proxy that fails on attribute access
+        return None
     return obj
 
 
@@ -107,7 +111,7 @@ def _is_class_var(tp, owner=None):
             return True
         # t.ClassVar after `import typing as t` is ClassVar; models.ClassVar,
         # a class named ClassVar, is not
-        return owner is not None and getattr(_lookup(owner, prefix[:-1]), 'ClassVar', None) is ClassVar
+        return owner is not None and _lookup(owner, prefix + 'ClassVar') is ClassVar
     return tp is ClassVar or get_origin(tp) is ClassVar
 
 
