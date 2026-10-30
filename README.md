@@ -280,8 +280,9 @@ Fields the API adds later are kept too, and reachable by dot. A runnable version
 
 - Names of `dict` methods (`items`, `keys`, `get`, ...) and of Prodict methods
   (`to_dict`, `from_dict`, `init`, ...) work as keys, but reading them with a dot returns
-  the method: use `p['items']`.
-- Keys that are not valid identifiers (`'first-name'`, `1`) work with brackets only.
+  the method: use `p['items']`. Names like `__deepcopy__` are bracket-only too.
+- Keys that are not valid identifiers (`'first-name'`, `1`) cannot be read with a dot; use
+  brackets, or `set_attribute()` to store a value with conversion.
 - `p['key'] = ...` and `update()` store values as they are, without conversion.
 - Dicts inside a list stay dicts unless the list is annotated (`List[Model]`).
 - Data lives in the dict, not in instance attributes: set defaults in `init()`, not as
