@@ -192,7 +192,9 @@ def _convert(tp, value):
         # dict, Dict and Dict[K, V]: a plain dict becomes a Prodict; keys and
         # values are not converted
         if isinstance(value, dict) and not isinstance(value, Prodict):
-            return Prodict.from_dict(value)
+            # a key Prodict cannot hold as an attribute, such as 'items',
+            # keeps the dict as given
+            return _try(Prodict.from_dict, value)
         return value
     if isinstance(tp, type) and origin is None and issubclass(tp, Prodict):
         if isinstance(value, dict) and not isinstance(value, tp):

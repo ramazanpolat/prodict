@@ -38,6 +38,9 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   ([#21](https://github.com/ramazanpolat/prodict/issues/21)).
 - `List[Any]`, `List[Optional[T]]` and other lists of non-class types no longer raise
   `TypeError`.
+- A dict with a key Prodict cannot hold as an attribute (`items`, `keys`, a non-string
+  key) given to a `dict` attribute or as a `List[dict]` item is stored as given instead of
+  raising `TypeError`.
 - String annotations, including `from __future__ import annotations`, convert values. An
   annotation that cannot be resolved stores values as given instead of raising
   `TypeError` for dicts, and does not stop the model's other annotations from converting.

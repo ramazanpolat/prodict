@@ -926,6 +926,19 @@ class TestProdict(TestCase):
         self.assertEqual(m.amounts, [Decimal('1.5')])
         self.assertIsInstance(m.dicts[0], Prodict)
 
+    def test_dicts_that_cannot_become_prodicts(self):
+        # keys named like dict methods, or not strings, keep the dict as given
+        class M(Prodict):
+            d: dict
+            rows: List[dict]
+
+        page, row, numbered = {'items': [1]}, {'items': 1}, {1: 'one'}
+        m = M(d=page, rows=[row, numbered, {'a': 1}])
+        self.assertIs(m.d, page)
+        self.assertIs(m.rows[0], row)
+        self.assertIs(m.rows[1], numbered)
+        self.assertIsInstance(m.rows[2], Prodict)
+
     def test_list_items_that_cannot_be_converted(self):
         class TD(TypedDict):
             a: int
