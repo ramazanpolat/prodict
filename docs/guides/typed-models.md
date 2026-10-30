@@ -115,18 +115,18 @@ except that dicts become `Prodict` instances:
 
 ## Passing data in
 
-Give a model its data as keyword arguments or through `from_dict()`. A dict passed
-positionally is stored by `dict` itself, and the annotated attributes are then reset to
-`None`, so their values are lost:
+Give a model its data as keyword arguments, through `from_dict()`, or as a positional
+dict. Annotated attributes are converted the same way in each case, and keyword arguments
+win over a positional dict:
 
 ```python
 >>> class Point(Prodict):
 ...     x: int
 
->>> Point(x='1'), Point.from_dict({'x': '1'})
-({'x': 1}, {'x': 1})
->>> Point({'x': '1'})
-{'x': None}
+>>> Point(x='1'), Point.from_dict({'x': '1'}), Point({'x': '1'})
+({'x': 1}, {'x': 1}, {'x': 1})
+>>> Point({'x': '1'}, x='2')
+{'x': 2}
 
 ```
 
