@@ -201,13 +201,16 @@ def _is_dunder(name):
 def _takes_keywords(cls, d):
     """
     True if a subclass's own constructor wants the data as keyword arguments,
-    the way from_dict() passed it before 0.9: it has no *args, and the data
-    binds to its signature.
+    the way from_dict() passed it before 0.9: the data binds to its signature,
+    and it is not a plain forwarder such as __init__(self, *args, **kwargs).
     """
     options = {'annotation_format': annotationlib.Format.STRING} if annotationlib is not None else {}
     try:
         signature = inspect.signature(cls.__init__, **options)
-        if any(p.kind is p.VAR_POSITIONAL for p in signature.parameters.values()):
+        parameters = list(signature.parameters.values())[1:]
+        forwarder = bool(parameters) and parameters[0].kind is parameters[0].VAR_POSITIONAL and not any(
+            p.kind is p.KEYWORD_ONLY and p.default is p.empty for p in parameters)
+        if forwarder:
             return False
         signature.bind(None, **d)
     except Exception:
@@ -356,10 +359,13 @@ class Prodict(dict):
                 _store(self, k, v)
         finally:
             if source is not None:
-                entries = active[id(source)]
-                entries[:] = [entry for entry in entries if entry[1] is not self]
+                entries = active.get(id(source), [])
+                for index in range(len(entries) - 1, -1, -1):
+                    if entries[index][1] is self:
+                        del entries[index]  # this constructor's own entry
+                        break
                 if not entries:
-                    del active[id(source)]
+                    active.pop(id(source), None)
 
     def init(self):
         ...
