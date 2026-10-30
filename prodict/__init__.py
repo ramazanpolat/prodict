@@ -1,6 +1,6 @@
 # Global comments:
 # self is avoided to fix #15
-from typing import Any, ClassVar, ForwardRef, List, Union, get_args, get_origin, get_type_hints
+from typing import Any, ClassVar, ForwardRef, List, Type, TypeVar, Union, get_args, get_origin, get_type_hints
 import copyreg
 import inspect
 import re
@@ -165,22 +165,35 @@ def _without_class_vars(types, unresolved):
 
 
 # the dicts being converted to Prodicts in this thread, so that a dict that
-# contains itself becomes a Prodict that contains itself:
-# {(id(source dict), Prodict class): (source dict, Prodict)}
+# contains itself becomes a Prodict that contains itself, and a dict that
+# appears twice becomes one Prodict: {id(source dict): (source dict, Prodict)}
 _converting = threading.local()
 
 
 def _converted(cls, value):
-    # the Prodict of class cls that value is being converted to, or None
+    # the instance of cls that value is being converted to, or None
     memo = getattr(_converting, 'memo', None)
-    entry = memo.get((id(value), cls)) if memo else None
-    return entry[1] if entry is not None and entry[0] is value else None
+    entry = memo.get(id(value)) if memo else None
+    if entry is not None and entry[0] is value and isinstance(entry[1], cls):
+        return entry[1]
+    return None
 
 
 def _from_dict(cls, value):
     # converts a plain dict to cls, reusing a conversion already under way
     target = _converted(cls, value)
-    return target if target is not None else cls.from_dict(value)
+    if target is not None:
+        return target
+    try:
+        return cls.from_dict(value)
+    except BaseException:
+        # a model whose constructor failed, even after Prodict.__init__
+        # finished, is not reused for the same dict elsewhere
+        memo = getattr(_converting, 'memo', None)
+        entry = memo.get(id(value)) if memo else None
+        if entry is not None and entry[0] is value and type(entry[1]) is cls:
+            del memo[id(value)]
+        raise
 
 
 def _is_dunder(name):
@@ -188,29 +201,24 @@ def _is_dunder(name):
     return isinstance(name, str) and len(name) > 4 and name.startswith('__') and name.endswith('__')
 
 
-def _takes_keywords(init):
+def _takes_keywords(cls, d):
     """
-    True if a custom __init__ expects the data as keyword arguments, as
-    from_dict() passed it before 0.9: it takes **kwargs, and neither *args
-    nor a required positional parameter.
+    True if a subclass's own constructor accepts the data as keyword
+    arguments, the way from_dict() passed it before 0.9.
     """
+    options = {'annotation_format': annotationlib.Format.STRING} if annotationlib is not None else {}
     try:
-        parameters = list(inspect.signature(init).parameters.values())[1:]
-    except (TypeError, ValueError):
+        inspect.signature(cls.__init__, **options).bind(None, **d)
+    except Exception:
         return False
-    kinds = {parameter.kind for parameter in parameters}
-    required_positional = any(
-        parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
-        and parameter.default is parameter.empty
-        for parameter in parameters
-    )
-    return (inspect.Parameter.VAR_KEYWORD in kinds and inspect.Parameter.VAR_POSITIONAL not in kinds
-            and not required_positional)
+    return True
 
 
 def _try(constructor, value):
     try:
         return constructor(value)
+    except RecursionError:
+        raise
     except Exception:
         # the value cannot be converted: store it as given
         return value
@@ -306,6 +314,9 @@ def _none_condition(v, is_recursive, exclude_none):
     return v is not None if exclude_none else True
 
 
+_P = TypeVar('_P', bound='Prodict')
+
+
 # noinspection PyMethodParameters
 class Prodict(dict):
     """
@@ -331,22 +342,13 @@ class Prodict(dict):
         outermost = memo is None
         if outermost:
             memo = _converting.memo = {}
-        key = None
+        source = args[0] if len(args) == 1 and isinstance(args[0], dict) and not kwargs else None
         try:
-            pending = getattr(_converting, 'pending', None)
-            if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
-                source = args[0]
-            elif pending is not None and pending[0] is type(self):
-                source = pending[1]  # from_dict() called cls(**d)
-                _converting.pending = None
-            else:
-                source = None
             if source is not None:
-                key = (id(source), type(self))
-                memo[key] = (source, self)
-            # defaults first, each instance its own: init() does not see the
+                memo[id(source)] = (source, self)
+            # defaults first, each instance its own: init() runs outside the
             # conversions under way
-            _converting.memo = {}
+            _converting.memo = None
             try:
                 self.init()
             finally:
@@ -358,8 +360,8 @@ class Prodict(dict):
                 _store(self, k, v)
         except BaseException:
             # a failed instance is not reused for the same dict elsewhere
-            if key is not None and memo.get(key, (None, None))[1] is self:
-                del memo[key]
+            if source is not None and memo.get(id(source), (None, None))[1] is self:
+                del memo[id(source)]
             raise
         finally:
             if outermost:
@@ -409,21 +411,17 @@ class Prodict(dict):
         # copy of the data instead, which the items already restore
         if isinstance(state, tuple):
             attributes, slots = state
-            vars(self).update(attributes)
-            for name, value in slots.items():
+            vars(self).update(attributes or {})
+            for name, value in (slots or {}).items():
                 object.__setattr__(self, name, value)
 
     @classmethod
-    def from_dict(cls, d: dict):
-        if (cls.__init__ is not Prodict.__init__ and _takes_keywords(cls.__init__)
-                and all(isinstance(k, str) for k in d)):
-            # a subclass whose own constructor takes only keyword arguments
-            # gets the data that way, as before 0.9
-            _converting.pending = (cls, d)
-            try:
-                return cls(**d)
-            finally:
-                _converting.pending = None
+    def from_dict(cls: Type[_P], d: dict) -> _P:
+        if (cls.__init__ is not Prodict.__init__ and all(isinstance(k, str) for k in d)
+                and _takes_keywords(cls, d)):
+            # a subclass with its own constructor gets the data as keyword
+            # arguments when it accepts them, as before 0.9
+            return cls(**d)
         return cls(d)
 
     @classmethod
@@ -510,11 +508,17 @@ class Prodict(dict):
     def __delattr__(self, name: str) -> None:
         if name in DICT_RESERVED_KEYS:
             raise TypeError("You cannot delete a reserved name as attribute")
-        descriptor = getattr(type(self), name, None)
-        if _is_dunder(name) or name in vars(self) or hasattr(type(descriptor), '__delete__'):
-            # an instance attribute, such as a cached_property value, or a
-            # descriptor that can be deleted
+        if _is_dunder(name) or name in vars(self):
+            # an instance attribute, such as a cached_property value
             super().__delattr__(name)
+        elif hasattr(type(inspect.getattr_static(type(self), name, None)), '__delete__'):
+            # a descriptor that may delete: a property deleter, a filled slot
+            try:
+                super().__delattr__(name)
+            except AttributeError:
+                if name not in self:
+                    raise
+                del self[name]
         elif name in self:
             del self[name]
         else:

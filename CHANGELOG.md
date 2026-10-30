@@ -8,6 +8,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 
 ### Added
 
+- `from_dict()` is typed to return the class it is called on, so an IDE completes the
+  fields of `Model.from_dict(...)`.
 - `del p.key` deletes a key, and `dir(p)` lists the keys that are identifiers, so a REPL
   or notebook can complete them.
 - Issue forms for bug reports and feature requests, a pull request template, and
@@ -26,9 +28,9 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   plain dict copies.
 - A Prodict assigned to an unannotated attribute, or passed in as data, is stored as it
   is, not copied.
-- `from_dict(d)` is `cls(d)` (still `cls(**d)` for a subclass whose own `__init__` takes
-  only keyword arguments): a positional dict, keyword arguments and `from_dict()` are
-  treated the same way.
+- `from_dict(d)` is `cls(d)` (still `cls(**d)` when a subclass's own `__init__` accepts
+  the data as keyword arguments): a positional dict, keyword arguments and `from_dict()`
+  are treated the same way.
 - A dict that appears twice in the data becomes one Prodict, referenced twice, and a dict
   that contains itself becomes a Prodict that contains itself.
 - A nested model whose constructor raises keeps its dict as given, like any other value
