@@ -212,8 +212,8 @@ including writing the data back out, is [examples/05-json-api-client](https://gi
   attribute assignment. `bool`, plain `tuple` and other types are stored as they come (a
   Prodict value for them raises `AttributeError`), and so is anything set with
   `p['key'] = ...` or `update()`.
-- Pass data as keyword arguments or through `from_dict()`. A dict passed positionally
-  (`Model({...})`) loses the values of annotated attributes.
+- Prefer keyword arguments or `from_dict()`. A dict passed positionally (`Model({...})`)
+  converts annotated attributes, but its unannotated nested dicts stay plain dicts.
 - `Optional[...]`, `Union[...]`, `Dict[K, V]`, a bare `dict`, and built-in generics such
   as `list[int]` are not supported as annotations; use `Any`, `Prodict` or the `typing`
   forms (`List[int]`).
