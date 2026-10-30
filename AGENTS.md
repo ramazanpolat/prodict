@@ -52,13 +52,16 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   came in positionally, sets every annotated attribute to `None`, calls the `init()` hook
   (where subclasses set defaults), then stores the positional data and the keyword
   arguments again through `_store()`, which converts them. Keyword arguments win.
-  `from_dict(d)` is `cls(d)`, or `cls(**d)` for a subclass with its own `__init__`. A
-  thread-local memo (`_converting`) maps each dict under conversion to its Prodict, so
-  cyclic and shared dicts stay cyclic and shared.
+  `from_dict(d)` is `cls(d)`, or `cls(**d)` for a subclass whose own `__init__` takes only
+  keyword arguments (`_takes_keywords`). A thread-local memo (`_converting`) maps each
+  dict under conversion to its Prodict, so cyclic and shared dicts stay cyclic and
+  shared; `init()` runs with an empty memo (defaults are never shared), a failed instance
+  is removed from it, and `from_dict()`'s `cls(**d)` passes its source as `pending`.
 - `__getattr__` / `__setattr__` / `__delattr__` map attributes to keys. A missing key
-  raises `AttributeError`, and so does any `__dunder__` name, so that protocol lookups
-  (`copy.deepcopy` asks for `__deepcopy__`) never get data. `__dir__` adds the keys that
-  are identifiers.
+  raises `AttributeError`, and so does any `__dunder__` name (`_is_dunder`), so that
+  protocol lookups (`copy.deepcopy` asks for `__deepcopy__`) never get data.
+  `__delattr__` deletes an instance attribute or a deletable descriptor before a key.
+  `__dir__` adds the keys that are identifiers and not dunder names.
 - `attr_types()` returns the annotations of the class and its base classes, via
   `typing.get_type_hints()`, without `ClassVar` ones. If that fails, each annotation is
   resolved on its own (`_resolve`, same name lookup order) and the ones that cannot be keep
@@ -79,9 +82,10 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
 - Unannotated plain dict values become `Prodict` instances; a Prodict is stored as it is.
 - Names of `dict` methods (`DICT_RESERVED_KEYS`) are accepted as keys in data, but
   `set_attribute()` / `__setattr__` / `__delattr__` refuse them (`TypeError`).
-- `__reduce__` returns the class, the instance attributes and slots, and the items, so
-  `copy`, `deepcopy` and `pickle` (every protocol) restore the stored data without
-  `init()` or conversion, and handle cycles. `__setstate__` restores attributes and slots
+- `__reduce__` returns the class (with `__getnewargs__` / `__getnewargs_ex__` if a
+  subclass defines them), the instance attributes and slots (or a subclass's own
+  `__getstate__()`), and the items, so `copy`, `deepcopy` and `pickle` (every protocol)
+  restore the stored data without `init()` or conversion, and handle cycles. `__setstate__` restores attributes and slots
   and ignores the copy of the data that pickles from 0.8.x carry.
 - Internal code calls `dict.items(self)` / `dict.keys(self)`, never `self.items()`, since a
   subclass may define a class attribute with that name.

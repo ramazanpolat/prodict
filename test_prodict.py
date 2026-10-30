@@ -126,6 +126,29 @@ class Strict(Prodict):
         super().__init__(**kwargs)
 
 
+class Positional(Prodict):
+    # a subclass with its own constructor that takes the data positionally
+    def __init__(self, data):
+        super().__init__(data)
+
+
+class Point(Prodict):
+    # a subclass with its own __new__ arguments and state hooks
+    def __new__(cls, x, y):
+        return super().__new__(cls)
+
+    def __init__(self, x, y):
+        super().__init__(x=x, y=y)
+
+    def __getnewargs__(self):
+        return self['x'], self['y']
+
+
+class Session(Prodict):
+    def __getstate__(self):
+        return {'token': None}  # never save the token
+
+
 class ForwardNode(Prodict):
     # string annotations, as with `from __future__ import annotations`
     value: 'int'
@@ -1361,3 +1384,93 @@ class TestProdict(TestCase):
         self.assertIn('alpha', names)
         self.assertIn('to_dict', names)
         self.assertNotIn('not-an-identifier', names)
+
+    def test_from_dict_with_other_constructors(self):
+        self.assertEqual(Positional.from_dict({'x': 1}), {'x': 1})
+        self.assertEqual(Positional.from_dict({'x': 1, 1: 'one'}), {'x': 1, 1: 'one'})
+        d = {'name': 'loop'}
+        d['me'] = d
+        strict = Strict.from_dict(d)
+        # 'me' is not annotated, so it becomes a Prodict, which contains itself
+        self.assertIs(type(strict['me']), Prodict)
+        self.assertIs(strict['me']['me'], strict['me'])
+        shared = {'x': 1}
+
+        class Holder(Prodict):
+            a: Strict
+            b: Strict
+
+        holder = Holder(a=shared, b=shared)
+        self.assertIs(holder.a, holder.b)
+
+    def test_failed_nested_model_is_not_reused(self):
+        class Broken(Prodict):
+            x: int
+
+            def init(self):
+                raise ValueError('cannot build')
+
+        class Holder(Prodict):
+            a: Broken
+            b: Broken
+
+        d = {'x': '1'}
+        holder = Holder(a=d, b=d)
+        self.assertIs(holder.a, d)
+        self.assertIs(holder.b, d)
+
+    def test_positional_and_keyword_data_together(self):
+        d = {'x': 1}
+        p = Prodict(d, z=d)
+        self.assertIsNot(p.z, p)
+        self.assertEqual(p.z, {'x': 1})
+
+    def test_init_defaults_are_not_shared(self):
+        defaults = {'level': 1}
+
+        class Item(Prodict):
+            def init(self):
+                self.meta = defaults
+
+        class Pair(Prodict):
+            a: Item
+            b: Item
+
+        pair = Pair(a={}, b={})
+        self.assertIsNot(pair.a.meta, pair.b.meta)
+
+    def test_copies_honor_subclass_hooks(self):
+        point = Point(1, 2)
+        session = Session(user='ada')
+        vars(session)['token'] = 'secret'
+        for clone in self.clones(point):
+            self.assertEqual(clone, {'x': 1, 'y': 2})
+            self.assertIs(type(clone), Point)
+        for clone in self.clones(session):
+            self.assertEqual(clone, {'user': 'ada'})
+            self.assertIsNone(vars(clone)['token'])
+
+    def test_private_slot_on_an_underscore_class(self):
+        cls = type('_', (Prodict,), {'__slots__': '__s'})
+        p = cls()
+        object.__setattr__(p, '__s', 7)
+        self.assertEqual(getattr(copy.copy(p), '__s'), 7)
+
+    def test_delete_prefers_instance_attributes(self):
+        class Cached(Prodict):
+            @functools.cached_property
+            def total(self):
+                return 3
+
+        c = Cached({'total': 99})
+        self.assertEqual(c.total, 3)  # the cached property wins on reads
+        del c.total
+        self.assertEqual(c['total'], 99)
+
+    def test_dunder_rule(self):
+        p = Prodict({'__': 1, '__x__': 2})
+        self.assertEqual(p.__, 1)  # too short to be a special name
+        self.assertNotIn('__x__', dir(p))
+        with self.assertRaises(AttributeError):
+            del p.__x__
+        self.assertEqual(p['__x__'], 2)
