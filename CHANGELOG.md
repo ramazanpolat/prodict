@@ -20,6 +20,11 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   on 3.8 and 3.9 when it declared annotations of its own.
 - A Prodict assigned to an attribute annotated with its class, a base class, `dict` or
   `List[...]` of its class is stored as it is, not copied.
+- `List[dict]` items become `Prodict` instances, like a `dict` attribute, instead of
+  plain dict copies.
+- `ClassVar` annotations are left out of the model: they no longer appear in every
+  instance as `None`.
+- `Annotated[T, ...]` annotations convert as `T`.
 - The internal `get_constructor()` method is gone; `set_attribute()` converts values.
 
 ### Fixed
@@ -27,7 +32,7 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 - `Optional[T]`, `Union[T, None]` and `T | None` annotations convert values as `T`,
   instead of storing them unconverted or, on Python 3.14+, raising `AttributeError`
   ([#38](https://github.com/ramazanpolat/prodict/issues/38)). Unions of several types store
-  values as given instead of raising.
+  values as given instead of raising `AttributeError` on Python 3.14+.
 - The built-in generics `list[T]`, `tuple[...]` and `dict[K, V]` work like `List[T]`,
   `Tuple[...]` and `Dict[K, V]` instead of raising `KeyError` or `TypeError`
   ([#21](https://github.com/ramazanpolat/prodict/issues/21)).
@@ -35,7 +40,7 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   `TypeError`.
 - String annotations, including `from __future__ import annotations`, convert values. An
   annotation that cannot be resolved stores values as given instead of raising
-  `TypeError` for dicts.
+  `TypeError` for dicts, and does not stop the model's other annotations from converting.
 - A dict passed positionally (`Model({...})`) no longer loses the values of annotated
   attributes; they are converted like keyword arguments, which still take precedence
   ([#55](https://github.com/ramazanpolat/prodict/issues/55)).

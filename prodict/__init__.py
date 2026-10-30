@@ -1,7 +1,8 @@
 # Global comments:
 # self is avoided to fix #15
-from typing import Any, List, Union, get_args, get_origin, get_type_hints
+from typing import Any, ClassVar, ForwardRef, List, Union, get_args, get_origin, get_type_hints
 import copy
+import sys
 import typing
 import weakref
 
@@ -56,6 +57,8 @@ _CONVERSION_ERRORS = (TypeError, ValueError, OverflowError)
 
 # annotations per class, collected over the class hierarchy
 _attr_types_cache = weakref.WeakKeyDictionary()
+# per class, the annotations that could not be resolved yet: {name: (owner, annotation)}
+_unresolved_cache = weakref.WeakKeyDictionary()
 
 
 def _own_annotations(klass):
@@ -63,6 +66,51 @@ def _own_annotations(klass):
     if annotationlib is not None:
         return annotationlib.get_annotations(klass, format=annotationlib.Format.FORWARDREF)
     return klass.__dict__.get('__annotations__', {})
+
+
+def _resolve(owner, annotation):
+    # resolves one annotation of class owner the way typing.get_type_hints() does
+    holder = type('_Annotation', (), {'__annotations__': {'a': annotation}, '__module__': owner.__module__})
+    return get_type_hints(holder, localns=dict(vars(owner)))['a']
+
+
+def _is_class_var(tp):
+    if isinstance(tp, ForwardRef):
+        tp = tp.__forward_arg__
+    if isinstance(tp, str):
+        return tp.startswith(('ClassVar', 'typing.ClassVar'))
+    return tp is ClassVar or get_origin(tp) is ClassVar
+
+
+def _collect_annotations(cls):
+    """
+    Returns the annotations of cls and its base classes, resolved where
+    possible, and the ones that could not be resolved.
+    """
+    try:
+        resolved = get_type_hints(cls)
+    except Exception:
+        resolved = None
+    types, unresolved = {}, {}
+    for klass in reversed(cls.__mro__):
+        for name, annotation in _own_annotations(klass).items():
+            unresolved.pop(name, None)  # a subclass may redeclare it
+            if resolved is not None:
+                annotation = resolved[name]
+            else:
+                # resolve one by one, so that one annotation that cannot be
+                # resolved does not stop the others from converting
+                try:
+                    annotation = _resolve(klass, annotation)
+                except Exception:
+                    unresolved[name] = (klass, annotation)
+            types[name] = annotation
+    for name, annotation in list(types.items()):
+        if _is_class_var(annotation):
+            # ClassVar annotations are class attributes, not keys
+            del types[name]
+            unresolved.pop(name, None)
+    return types, unresolved
 
 
 def _try(constructor, value):
@@ -108,7 +156,7 @@ def _convert(tp, value):
             return value
         args = get_args(tp)
         if args:
-            return [_convert(args[0], item) for item in items]
+            return [_convert_item(args[0], item) for item in items]
         return items
     if origin is tuple:
         # Tuple, Tuple[...] and tuple[...]; items are not converted
@@ -118,6 +166,16 @@ def _convert(tp, value):
     # bool, plain tuple, other classes, string annotations that could not be
     # resolved, and anything else: stored as given
     return value
+
+
+def _convert_item(tp, item):
+    # List[T] passes each item through T, also for classes that are stored as
+    # given at the top level, such as bool, tuple or Decimal
+    if (item is not None and tp is not Any and isinstance(tp, type) and get_origin(tp) is None
+            and tp not in (int, float, str, list, dict) and not issubclass(tp, Prodict)
+            and not isinstance(item, tp)):
+        return _try(tp, item)
+    return _convert(tp, item)
 
 
 def _none_condition(v, is_recursive, exclude_none):
@@ -191,25 +249,30 @@ class Prodict(dict):
 
     @classmethod
     def attr_type(cls, attr_name: str):
-        return cls.attr_types()[attr_name]
+        types = cls.attr_types()
+        unresolved = _unresolved_cache.get(cls)
+        if unresolved and attr_name in unresolved:
+            # try again: a forward reference may name a class defined since
+            owner, annotation = unresolved[attr_name]
+            try:
+                types[attr_name] = _resolve(owner, annotation)
+                unresolved.pop(attr_name, None)
+            except Exception:
+                pass
+        return types[attr_name]
 
     @classmethod
     def attr_types(cls):
         """
         Returns the annotations of the class and its base classes. String
-        annotations are resolved where possible.
+        annotations are resolved where possible; ClassVar annotations are left
+        out.
         """
         types = _attr_types_cache.get(cls)
         if types is None:
-            try:
-                types = get_type_hints(cls)
-            except Exception:
-                # an annotation that cannot be resolved, such as a forward
-                # reference to a class defined later: use them as written
-                types = {}
-                for klass in reversed(cls.__mro__):
-                    types.update(_own_annotations(klass))
+            types, unresolved = _collect_annotations(cls)
             _attr_types_cache[cls] = types
+            _unresolved_cache[cls] = unresolved
         return types
 
     @classmethod
@@ -227,7 +290,7 @@ class Prodict(dict):
         :param attr_name: Attribute name
         :return: bool
         """
-        return bool(cls.attr_types().get(attr_name))
+        return attr_name in cls.attr_types()
 
     def set_default(self, attr_name):
         if self.attr_has_default_value(attr_name):

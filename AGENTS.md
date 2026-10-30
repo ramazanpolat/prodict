@@ -56,13 +56,16 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
 - `__getattr__` / `__setattr__` map attributes to keys. A missing key raises
   `AttributeError`.
 - `attr_types()` returns the annotations of the class and its base classes, via
-  `typing.get_type_hints()`; if an annotation cannot be resolved, the raw annotations
-  (`annotationlib` on 3.14+) are used. The result is cached per class.
+  `typing.get_type_hints()`, without `ClassVar` ones; cached per class. If that fails, each
+  annotation is resolved on its own (`_resolve`) and the ones that cannot be keep their raw
+  form (`annotationlib` on 3.14+); `attr_type()` retries those, so a forward reference
+  converts once its class exists. `has_attr()` is `name in attr_types()`.
 - `set_attribute()` converts values for annotated attributes with `_convert(annotation,
   value)`: `int`, `float`, `str`, `list`; `List[T]` / `list[T]` (item-wise);
   `Tuple[...]` / `tuple[...]` (to `tuple`); `dict` / `Dict[K, V]` / `dict[K, V]` and
   `Prodict` (plain dict to `Prodict`); Prodict subclasses (`from_dict`, unless the value
-  already is an instance); `Optional[T]` / `T | None` (as `T`). Anything else (`Any`,
+  already is an instance); `Optional[T]` / `T | None` / `Annotated[T, ...]` (as `T`).
+  `List[T]` items go through `T` for any class `T` (`_convert_item`). Anything else (`Any`,
   `bool`, plain `tuple`, multi-type unions, unresolved strings) is stored as given, and so
   is a value whose conversion fails (`TypeError`, `ValueError`, `OverflowError`): an
   annotation never makes an assignment fail. `None` is never converted.

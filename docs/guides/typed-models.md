@@ -50,8 +50,8 @@ Plain dict operations, `p['price'] = ...` and `p.update(...)`, store the value a
 | `Any` | none | anything | unchanged |
 
 The built-in generics `list[T]`, `tuple[...]` and `dict[K, V]` (Python 3.9+) work like
-`List[T]`, `Tuple[...]` and `Dict[K, V]`, and `T | None` (Python 3.10+) like
-`Optional[T]`. A value that is already an instance of the annotated model is stored as it
+`List[T]`, `Tuple[...]` and `Dict[K, V]`, `T | None` (Python 3.10+) like
+`Optional[T]`, and `Annotated[T, ...]` like `T`. A value that is already an instance of the annotated model is stored as it
 is, not copied. `Dict[K, V]` does not convert keys and values to `K` and `V`; annotate
 with a Prodict subclass for that.
 
@@ -86,12 +86,17 @@ A value that cannot be converted is stored as given, and so is an item of a `Lis
 ## What is not converted
 
 - **`bool`, plain `tuple`, `set`** and other types not in the table are stored as they
-  come. `bool` is deliberately left alone, since `bool('false')` would be `True`.
+  come. `bool` is deliberately left alone, since `bool('false')` would be `True`. Inside
+  a `List[T]`, though, every item goes through `T` whatever class it is, so `List[bool]`,
+  `List[tuple]` and `List[Decimal]` convert their items.
 - **Unions of several types** (`Union[int, str]`) are stored as they come, since there is
   no single type to convert to.
 - **Annotations that cannot be resolved**, such as a string naming a class that does not
-  exist, are stored as they come. String annotations that can be resolved, including
-  those written with `from __future__ import annotations`, convert normally.
+  exist, are stored as they come; the model's other annotations still convert. String
+  annotations that can be resolved, including those written with
+  `from __future__ import annotations`, convert normally, and a forward reference starts
+  converting once its class exists. On Python 3.9 and 3.10, a quoted name inside a
+  built-in generic (`list['Node']`) is not resolved; write `List['Node']` there.
 - **Items added to a list later** (`model.items_list.append({...})`) are not converted.
   Append model instances yourself.
 
@@ -220,3 +225,18 @@ can see it:
 ```
 
 Keep values meant for instances out of class attributes; use `init()` for defaults.
+Annotate class-level settings with `ClassVar` to keep them out of the dict altogether:
+
+```python
+>>> from typing import ClassVar
+
+>>> class Store(Prodict):
+...     API_VERSION: ClassVar[int] = 2
+...     currency: str
+
+>>> Store(currency='EUR')
+{'currency': 'EUR'}
+>>> Store.API_VERSION
+2
+
+```

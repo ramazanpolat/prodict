@@ -213,7 +213,8 @@ including writing the data back out, is [examples/05-json-api-client](https://gi
 - Values are converted for `int`, `float`, `str`, `list`, `List[T]`, `Tuple[...]`,
   `Optional[T]`, `dict` and `Dict[K, V]` (a plain dict becomes a `Prodict`), and
   `Prodict` and its subclasses, when set as keyword arguments, through `from_dict()` or by
-  attribute assignment; `list[T]`, `tuple[...]`, `dict[K, V]` and `T | None` work too.
+  attribute assignment; `list[T]`, `tuple[...]`, `dict[K, V]`, `T | None` and
+  `Annotated[T, ...]` work too.
   `bool`, plain `tuple`, unions of several types and other annotations store values as
   they come, and so does anything set with `p['key'] = ...` or `update()`. A value that
   cannot be converted is stored as given.
