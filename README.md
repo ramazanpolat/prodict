@@ -5,11 +5,11 @@
 [![CI](https://github.com/ramazanpolat/prodict/actions/workflows/pythonapp.yml/badge.svg?branch=master)](https://github.com/ramazanpolat/prodict/actions/workflows/pythonapp.yml)
 [![License: MIT](https://img.shields.io/github/license/ramazanpolat/prodict)](https://github.com/ramazanpolat/prodict/blob/master/LICENSE.txt)
 
-**Prodict is what Python's `dict` meant to be: keys you can reach with dots, values typed
-by your annotations, and your IDE completing every name.** It is still a real `dict`, and
-an annotation never rejects a value.
+**Prodict is what Python's `dict` meant to be: a `dict` you can use with dots, typed by
+your annotations and completed by your IDE.** It is still a real `dict`, and an
+annotation never rejects a value.
 
-```python
+```pycon
 >>> from prodict import Prodict
 
 >>> p = Prodict.from_dict({'package': 'Prodict', 'rocks': {'even': 'more!'}})
@@ -18,9 +18,21 @@ an annotation never rejects a value.
 
 ```
 
-Declare the shape you care about, and values arrive with the right types:
+## Installation
 
-```python
+```bash
+pip install prodict
+# or
+uv add prodict
+```
+
+No dependencies. Python 3.8 or later; tested on 3.8 through 3.15.
+
+## Why Prodict
+
+Declare the fields you care about, and values are converted on the way in:
+
+```pycon
 >>> from typing import List
 
 >>> class Line(Prodict):
@@ -47,13 +59,13 @@ Declare the shape you care about, and values arrive with the right types:
 
 ```
 
-## Why Prodict
+![Auto-completion in PyCharm](https://raw.githubusercontent.com/ramazanpolat/prodict/master/docs/images/auto-complete1.png "Your IDE completes the attributes you declare")
 
 - `order.customer.address.city` reads better than `order['customer']['address']['city']`,
-  and your IDE completes it as you type.
+  and your IDE completes the fields you declared.
 - JSON from an API or a config file becomes objects you can navigate, in one call.
-- Annotations turn `'42'` into `42` and nested dicts into your own classes, methods and
-  all.
+- Annotations turn `'42'` into `42` and nested dicts into your own classes, methods
+  included.
 - It is a real `dict`: `json.dumps`, `==`, `**kwargs`, `isinstance(p, dict)` and every
   dict method keep working.
 - It is lenient. A value it cannot convert is stored as it is and keys you did not declare
@@ -67,28 +79,18 @@ Declare the shape you care about, and values arrive with the right types:
 | Nested data becomes your classes | no | no | yes | **yes** |
 | `'42'` becomes `42` for an `int` field | no | no | yes | **yes** |
 | Undeclared keys are kept | yes | no | if configured | **yes** |
-| Bad data raises an error | no | no | yes | **no, it is kept** |
+| A value of the wrong type raises an error | no | no | yes | **no, it is kept** |
 | Dependencies | none | none | a few | **none** |
 
 If bad input should be rejected with an error, use a validation library such as
 [pydantic](https://docs.pydantic.dev/). If you do not need a dict, a
 [dataclass](https://docs.python.org/3/library/dataclasses.html) is simpler.
 
-## Installation
-
-```bash
-pip install prodict
-# or
-uv add prodict
-```
-
-Python 3.8 or later; tested on 3.8 through 3.15.
-
 ## Quick tour
 
 ### Keys are attributes
 
-```python
+```pycon
 >>> p = Prodict(lang='Python', pros='Rocks!')
 >>> p.lang
 'Python'
@@ -106,17 +108,17 @@ A missing attribute raises `AttributeError`, so `getattr(p, 'name', default)` an
 
 ### Nested dicts become Prodicts
 
-Dicts inside dicts become Prodicts too, whether the data comes in through `from_dict()`,
-as a positional dict, as keyword arguments or by assignment. (Dicts inside a list need an
-annotation such as `List[Model]`; see below.)
+Through the constructor, `from_dict()` or dot assignment, dicts inside dicts become
+Prodicts too. Dicts inside a list need an annotation such as `List[Model]` or
+`List[dict]`.
 
-```python
+```pycon
 >>> config = Prodict({'db': {'host': 'localhost', 'port': 5432}})
 >>> config.db.host
 'localhost'
->>> config.db.port = 6432
->>> config
-{'db': {'host': 'localhost', 'port': 6432}}
+>>> config.cache = {'ttl': 60}
+>>> config.cache.ttl
+60
 
 ```
 
@@ -125,7 +127,7 @@ annotation such as `List[Model]`; see below.)
 Subclass `Prodict` and annotate. Every annotated attribute exists from the start, `None`
 until set, and values are converted on the way in.
 
-```python
+```pycon
 >>> from typing import Optional
 
 >>> class Book(Prodict):
@@ -144,8 +146,6 @@ until set, and values are converted on the way in.
 
 ```
 
-![Auto-completion in PyCharm](https://raw.githubusercontent.com/ramazanpolat/prodict/master/docs/images/auto-complete1.png "Auto-completion in action")
-
 What each annotation does with a value set through the constructor, `from_dict()` or an
 attribute:
 
@@ -155,15 +155,15 @@ attribute:
 | `list` | `('a', 'b')` | `['a', 'b']` |
 | `List[T]` | `['1', '2']` for `List[int]` | `[1, 2]`, each item through `T` |
 | `Tuple[...]` | `['1', '2']` | `('1', '2')`, items unchanged |
-| `Optional[T]`, `Annotated[T, ...]` | `'7'` for `Optional[int]` | `7` |
+| `Optional[T]` | `'7'` for `Optional[int]` | `7` |
 | a Prodict subclass | `{'id': '1'}` | an instance of that class |
-| `dict`, `Dict[K, V]`, `Prodict` | `{'a': '1'}` | a `Prodict`, values unchanged |
+| `dict`, `Dict[K, V]`, `Prodict` | `{'a': '1'}` | a `Prodict`; keys and values are not converted to `K`, `V` |
 | `Any`, `bool`, plain `tuple`, `Union[A, B]`, anything else | anything | unchanged |
 
-The built-in forms work too: `list[int]` and `dict[str, int]` on Python 3.9+, `int | None`
-on 3.10+. So do string annotations and `from __future__ import annotations`. `None` is
-never converted, and `p['key'] = ...` and `update()` store values unchanged, as in any
-dict. The
+On Python 3.9+, `list[int]`, `tuple[int, ...]`, `dict[str, int]` and
+`Annotated[int, ...]` work too, and on 3.10+, `int | None`. String annotations and
+`from __future__ import annotations` work as well (on 3.9 and 3.10, write
+`List['Node']` rather than `list['Node']`). `None` is never converted. The
 [typed models guide](https://github.com/ramazanpolat/prodict/blob/master/docs/guides/typed-models.md)
 has the details.
 
@@ -173,7 +173,7 @@ Override `init()`, not `__init__`, to set defaults; the data you pass in wins ov
 A subclass has its base classes' attributes and defaults; if it overrides `init()` too,
 it calls `super().init()` to keep them.
 
-```python
+```pycon
 >>> class Settings(Prodict):
 ...     retries: int
 ...     timeout: float
@@ -192,7 +192,7 @@ it calls `super().init()` to keep them.
 
 ### JSON, copies and any key
 
-```python
+```pycon
 >>> import json
 >>> json.dumps(dune)
 '{"title": "Dune", "year": 1965, "price": 9.99, "isbn": null}'
@@ -204,13 +204,17 @@ it calls `super().init()` to keep them.
 
 ```
 
-`copy.copy`, `copy.deepcopy` and `pickle` keep the model class and the data as it is.
-`dir(p)` lists the keys that are identifiers, so a REPL or notebook completes them too.
+`to_dict()` works on the top level; `is_recursive=True` converts nested models too (see
+the [serialization guide](https://github.com/ramazanpolat/prodict/blob/master/docs/guides/serialization.md)).
+`copy.copy`, `copy.deepcopy` and `pickle` keep the model class and the data as it is,
+while `p.copy()` returns a plain `dict`, as for any dict subclass. `dir(p)` lists the
+keys that are identifiers, so a REPL or notebook completes them too.
 
 ## A real API in a few lines
 
 Declare only the fields you use; everything else in the response is kept and reachable
-too. This runs as is against the GitHub API:
+too. With [Requests](https://requests.readthedocs.io/) installed
+(`pip install requests`), this runs against the GitHub API:
 
 ```python
 import json
@@ -234,16 +238,16 @@ class Repo(Prodict):
 
 repo = Repo.from_dict(requests.get('https://api.github.com/repos/ramazanpolat/prodict').json())
 repo.owner.login        # 'ramazanpolat', and your IDE completed it
-repo.license.spdx_id    # 'MIT'
+repo.license.spdx_id    # 'MIT' (license is None for a repository without one)
 repo.description        # not declared, still there
 repo.owner.html_url     # undeclared nested fields too
-json.dumps(repo)        # the original JSON, unchanged
+json.dumps(repo)        # back to JSON, every field included
 ```
 
 Without Prodict, the same reads are `data['owner']['login']` and
-`data['license']['spdx_id'] if data['license'] else None`, with no completion and no
-types. A runnable program that reads JSON into typed models, computes with them and writes
-JSON back is [examples/05-json-api-client](https://github.com/ramazanpolat/prodict/tree/master/examples/05-json-api-client).
+`data['license']['spdx_id']`, with no completion and no types. A runnable program that
+reads JSON into typed models, computes with them and writes JSON back is
+[examples/05-json-api-client](https://github.com/ramazanpolat/prodict/tree/master/examples/05-json-api-client).
 
 ## Good to know
 
@@ -251,11 +255,11 @@ JSON back is [examples/05-json-api-client](https://github.com/ramazanpolat/prodi
   (`to_dict`, `from_dict`, `init`, ...) work as keys, but reading them with a dot returns
   the method: use `p['items']`. Setting or deleting a `dict` method name with a dot
   raises `TypeError`. Names like `__deepcopy__` are bracket-only too.
-- Keys that are not valid identifiers (`'first-name'`, `1`) cannot be read with a dot; use
-  brackets, or `set_attribute()` to store a value with conversion.
+- Keys that are not valid identifiers (`'first-name'`, `1`) or are Python keywords
+  (`'class'`, `'from'`) cannot be used with a dot; use brackets, or `set_attribute()` to
+  store a value with conversion.
 - `p['key'] = ...`, `update()` and later changes such as `p.tags.append('4')` store
   values as they are, without conversion.
-- Dicts inside a list stay dicts unless the list is annotated (`List[Model]`).
 - Data lives in the dict, not in instance attributes: set defaults in `init()`, not as
   class attributes, and annotate class-level settings with `ClassVar`.
 
@@ -263,13 +267,15 @@ JSON back is [examples/05-json-api-client](https://github.com/ramazanpolat/prodi
 
 0.9 makes Prodict lenient and more dict-like. What you may notice:
 
-- A value that cannot be converted is stored as given instead of raising `ValueError`.
+- A value that cannot be converted is stored as given instead of raising `ValueError` or
+  `TypeError`.
 - `Optional[T]`, `T | None`, built-in generics (`list[int]`) and string annotations
   work, and a subclass inherits its base classes' annotations.
 - `Model({...})` works like `Model.from_dict({...})`, nested dicts included, and keys
   such as `items` work in data.
-- A Prodict you pass in is stored as it is, not copied; `deepcopy` and `pickle` no longer
-  run `init()` or convert values again.
+- A Prodict you pass in is stored as it is, not copied, when the field is unannotated or
+  it already has the annotated class; `deepcopy` and `pickle` no longer run `init()` or
+  convert values again.
 
 The [changelog](https://github.com/ramazanpolat/prodict/blob/master/CHANGELOG.md) lists
 every change.
