@@ -1,7 +1,9 @@
 # Global comments:
 # self is avoided to fix #15
-from typing import Any, Dict, List
+from typing import Any, List, Union, get_args, get_origin, get_type_hints
 import copy
+import typing
+import weakref
 
 DICT_RESERVED_KEYS = vars(dict).keys()
 
@@ -36,14 +38,86 @@ def _dict_value(v, is_recursive, exclude_none, exclude_none_in_lists, convert_li
     return v
 
 
-def _is_dict_annotation(tp):
-    # dict, typing.Dict, Dict[K, V] and dict[K, V]
-    return tp is dict or tp is Dict or getattr(tp, '__origin__', None) is dict
+try:
+    from types import UnionType as _UnionType  # X | Y, Python 3.10+
+    _UNION_TYPES = (Union, _UnionType)
+except ImportError:
+    _UNION_TYPES = (Union,)
+
+_ANNOTATED = getattr(typing, 'Annotated', None)  # Python 3.9+
+
+try:
+    import annotationlib  # Python 3.14+, where annotations are evaluated lazily
+except ImportError:
+    annotationlib = None
+
+# conversions that may fail on a value; the value is then stored as given
+_CONVERSION_ERRORS = (TypeError, ValueError, OverflowError)
+
+# annotations per class, collected over the class hierarchy
+_attr_types_cache = weakref.WeakKeyDictionary()
 
 
-def _is_prodict_class(tp):
-    # isinstance(tp, type) rules out typing generics, which issubclass() rejects
-    return isinstance(tp, type) and not hasattr(tp, '__origin__') and issubclass(tp, Prodict)
+def _own_annotations(klass):
+    # the annotations a class declares itself, unevaluated where they cannot be
+    if annotationlib is not None:
+        return annotationlib.get_annotations(klass, format=annotationlib.Format.FORWARDREF)
+    return klass.__dict__.get('__annotations__', {})
+
+
+def _try(constructor, value):
+    try:
+        return constructor(value)
+    except _CONVERSION_ERRORS:
+        return value
+
+
+def _convert(tp, value):
+    """
+    Converts value to the annotation tp where Prodict knows how, and returns
+    it unchanged otherwise. An annotation never makes an assignment fail.
+    """
+    if value is None or tp is Any:
+        return value
+    origin = get_origin(tp)
+    if origin in _UNION_TYPES:
+        # Optional[X], Union[X, None] and X | None convert as X; any other
+        # union stores the value as given
+        args = [a for a in get_args(tp) if a is not type(None)]
+        return _convert(args[0], value) if len(args) == 1 else value
+    if _ANNOTATED is not None and origin is _ANNOTATED:
+        return _convert(get_args(tp)[0], value)
+    if tp in (int, float, str, list):
+        return _try(tp, value)
+    if tp is dict or origin is dict:
+        # dict, Dict and Dict[K, V]: a plain dict becomes a Prodict; keys and
+        # values are not converted
+        if isinstance(value, dict) and not isinstance(value, Prodict):
+            return Prodict.from_dict(value)
+        return value
+    if isinstance(tp, type) and origin is None and issubclass(tp, Prodict):
+        if isinstance(value, dict) and not isinstance(value, tp):
+            return tp.from_dict(value)
+        return value
+    if origin is list:
+        # List, List[T] and list[T]; a mapping is stored as given
+        if isinstance(value, dict):
+            return value
+        items = _try(list, value)
+        if items is value:
+            return value
+        args = get_args(tp)
+        if args:
+            return [_convert(args[0], item) for item in items]
+        return items
+    if origin is tuple:
+        # Tuple, Tuple[...] and tuple[...]; items are not converted
+        if isinstance(value, dict):
+            return value
+        return _try(tuple, value)
+    # bool, plain tuple, other classes, string annotations that could not be
+    # resolved, and anything else: stored as given
+    return value
 
 
 def _none_condition(v, is_recursive, exclude_none):
@@ -121,7 +195,22 @@ class Prodict(dict):
 
     @classmethod
     def attr_types(cls):
-        return cls.__annotations__ if hasattr(cls, '__annotations__') else {}
+        """
+        Returns the annotations of the class and its base classes. String
+        annotations are resolved where possible.
+        """
+        types = _attr_types_cache.get(cls)
+        if types is None:
+            try:
+                types = get_type_hints(cls)
+            except Exception:
+                # an annotation that cannot be resolved, such as a forward
+                # reference to a class defined later: use them as written
+                types = {}
+                for klass in reversed(cls.__mro__):
+                    types.update(_own_annotations(klass))
+            _attr_types_cache[cls] = types
+        return types
 
     @classmethod
     def attr_names(cls) -> List[str]:
@@ -149,94 +238,17 @@ class Prodict(dict):
             self.set_attribute(attr_name, None)
             self.update({attr_name: attr_default_value})
 
-    def get_constructor(self, attr_name, value):
-        """
-        This method is used for type conversion.
-        Prodict uses this method to get the type of a value, then based on the
-        value, it return a constructor. If the type of a value is 'float' then
-        it returns 'float' since 'float' is also a constructor to build a float
-        value.
-        """
-        attr_type1 = self.attr_type(attr_name)
-        constructor = None
-        element_type = None
-        if attr_type1 == float:
-            constructor = float
-        elif attr_type1 == str:
-            constructor = str
-        elif attr_type1 == int:
-            constructor = int
-        elif attr_type1 == list:
-            constructor = list
-        elif attr_type1 is Any:
-            constructor = None
-        elif isinstance(value, dict):
-            if _is_dict_annotation(attr_type1):
-                # #56, #57: a Prodict value is already in converted form
-                if not isinstance(value, Prodict):
-                    constructor = Prodict.from_dict
-            elif _is_prodict_class(attr_type1):
-                constructor = attr_type1.from_dict
-            # #56: other annotations (bool, tuple, List[T], ...) store dicts
-            # and Prodicts as they come
-        elif attr_type1 is List:
-            constructor = list
-        elif hasattr(attr_type1, '__origin__'):
-            if attr_type1.__dict__['__origin__'] is list:
-                # if the type is 'List[something]'
-                if len(attr_type1.__args__) == 0:
-                    constructor = list
-                elif len(attr_type1.__args__) == 1:
-                    constructor = List
-                    element_type = attr_type1.__args__[0]
-                elif len(attr_type1.__args__) > 1:
-                    raise TypeError('Only one dimensional List is supported')
-            elif attr_type1.__dict__['__origin__'] is tuple:
-                # if the type is 'Tuple[something]'
-                constructor = tuple
-
-        # print('constru={} element_type={}'.format(constructor, element_type))
-        return constructor, element_type
-
     def set_attribute(self, attr_name, value):
         if attr_name in DICT_RESERVED_KEYS:
             raise TypeError("You cannot set a reserved name as attribute")
         if self.has_attr(attr_name):
-            if value is None:
-                self.update({attr_name: None})
-            elif self.attr_type(attr_name) == Any:
-                self[attr_name] = value
+            value = _convert(self.attr_type(attr_name), value)
+        elif isinstance(value, dict):
+            if isinstance(value, Prodict):
+                value = value.from_dict(value)
             else:
-                constructor, element_type = self.get_constructor(
-                    attr_name, value
-                )
-                if constructor is None:
-                    self.update({attr_name: value})
-                elif constructor == List:
-                    value_list: List[element_type] = value
-                    new_list: List[element_type] = []
-
-                    if issubclass(element_type, Prodict):
-                        element_constructor = element_type.from_dict
-                    else:
-                        element_constructor = element_type
-
-                    for v in value_list:
-                        new_list.append(element_constructor(v))
-                    self.update({attr_name: new_list})
-                elif constructor == list:
-                    self.update({attr_name: list(value)})
-                else:
-                    self.update({attr_name: constructor(value)})
-        else:
-            if isinstance(value, dict):
-                if isinstance(value, Prodict):
-                    constructor = value.from_dict
-                else:
-                    constructor = Prodict.from_dict
-                self.update({attr_name: constructor(value)})
-            else:
-                self.update({attr_name: value})
+                value = Prodict.from_dict(value)
+        self.update({attr_name: value})
 
     def set_attributes(self_d921dfa9_4e93_4123_893d_a7e7eb783a32, **d):
         for k, v in d.items():

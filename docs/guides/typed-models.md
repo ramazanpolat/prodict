@@ -1,8 +1,10 @@
 # Typed models
 
 Annotations on a `Prodict` subclass do two things: they let your IDE complete attribute
-names, and they make Prodict convert values when they are set. This guide lists exactly
-what is converted and what is not. Every code block is run by the test suite.
+names, and they make Prodict convert values when they are set. Conversion is a
+convenience, not validation: a value Prodict cannot convert is stored as given, so an
+annotation never makes an assignment fail. This guide lists exactly what is converted and
+what is not. Every code block is run by the test suite.
 
 ## Declaring a model
 
@@ -43,8 +45,15 @@ Plain dict operations, `p['price'] = ...` and `p.update(...)`, store the value a
 | `List[T]` | each item through `T` | `['1', '2']` with `List[int]` | `[1, 2]` |
 | a Prodict subclass | `Model.from_dict(value)` | `{'id': '1'}` | a `Model` instance |
 | `List[Model]` | each item through `Model.from_dict` | `[{'id': '1'}]` | a list of `Model` |
-| `Prodict` | `Prodict.from_dict(value)` | `{'a': 1}` | a `Prodict` |
+| `Prodict`, `dict`, `Dict[K, V]` | `Prodict.from_dict(value)` | `{'a': 1}` | a `Prodict` |
+| `Optional[T]` | through `T` | `'7'` with `Optional[int]` | `7` |
 | `Any` | none | anything | unchanged |
+
+The built-in generics `list[T]`, `tuple[...]` and `dict[K, V]` (Python 3.9+) work like
+`List[T]`, `Tuple[...]` and `Dict[K, V]`, and `T | None` (Python 3.10+) like
+`Optional[T]`. A value that is already an instance of the annotated model is stored as it
+is, not copied. `Dict[K, V]` does not convert keys and values to `K` and `V`; annotate
+with a Prodict subclass for that.
 
 ```python
 >>> p = Product(name=7, price='9.5', stock='42', tags=('a', 'b'), extra='42')
@@ -61,45 +70,62 @@ Plain dict operations, `p['price'] = ...` and `p.update(...)`, store the value a
 
 `None` is never converted: setting an annotated attribute to `None` stores `None`.
 
-A value that cannot be converted raises the constructor's own error:
+A value that cannot be converted is stored as given, and so is an item of a `List[T]`:
 
 ```python
->>> Product(stock='many')
-Traceback (most recent call last):
-    ...
-ValueError: invalid literal for int() with base 10: 'many'
+>>> Product(stock='many').stock
+'many'
+>>> class Order(Prodict):
+...     quantities: List[int]
+
+>>> Order(quantities=['1', 'two']).quantities
+[1, 'two']
 
 ```
 
 ## What is not converted
 
 - **`bool`, plain `tuple`, `set`** and other types not in the table are stored as they
-  come, Prodict values included. `bool` is deliberately left alone, since
-  `bool('false')` would be `True`.
+  come. `bool` is deliberately left alone, since `bool('false')` would be `True`.
+- **Unions of several types** (`Union[int, str]`) are stored as they come, since there is
+  no single type to convert to.
+- **Annotations that cannot be resolved**, such as a string naming a class that does not
+  exist, are stored as they come. String annotations that can be resolved, including
+  those written with `from __future__ import annotations`, convert normally.
 - **Items added to a list later** (`model.items_list.append({...})`) are not converted.
   Append model instances yourself.
 
 ```python
+>>> from typing import Optional, Union
+
 >>> class Flags(Prodict):
 ...     enabled: bool
 ...     size: tuple
+...     code: Union[int, str]
+...     retries: Optional[int]
 
->>> Flags(enabled='false', size=[1, 2])
-{'enabled': 'false', 'size': [1, 2]}
+>>> Flags(enabled='false', size=[1, 2], code='7', retries='3')
+{'enabled': 'false', 'size': [1, 2], 'code': '7', 'retries': 3}
 
 ```
 
-## Unsupported annotations
+## Inheritance
 
-- **`Optional[...]` and `Union[...]`**: depending on the value and the Python version, a
-  value is stored unconverted or raises an error (dicts and Prodicts are stored
-  unconverted; on Python 3.14 and later other non-`None` values raise `AttributeError`).
-  Annotate such attributes with `Any`.
-- **`dict` and `Dict[K, V]`**: a plain dict is converted to a `Prodict` and a Prodict is
-  stored as it is, but the keys and values are not converted to `K` and `V`. Annotate with
-  a Prodict subclass to get converted values.
-- **Built-in generics** (`list[int]`, `tuple[int, ...]`, `dict[str, int]`): raise an error
-  (`KeyError` or `TypeError`) for most values. Use the `typing` forms (`List[int]`, `Tuple[int, ...]`).
+A subclass of a model has the annotations of its base classes too:
+
+```python
+>>> class Base(Prodict):
+...     id: int
+
+>>> class User(Base):
+...     name: str
+
+>>> User()
+{'id': None, 'name': None}
+>>> User(id='1', name=2)
+{'id': 1, 'name': '2'}
+
+```
 
 ## Unannotated keys
 

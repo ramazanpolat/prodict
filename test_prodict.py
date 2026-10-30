@@ -1,6 +1,7 @@
 import pickle
+import sys
 from unittest import TestCase
-from typing import List, Any, Tuple, Dict
+from typing import List, Any, Tuple, Dict, Optional, Union
 import unittest
 from datetime import datetime
 from prodict import Prodict
@@ -63,7 +64,7 @@ class AnyType(Prodict):
 
 class SimpleKeyValue(Prodict):
     int_key: int
-    str_key: str
+    str_key: Optional[str]  # #8: lets type checkers accept None
     float_key: float
 
 
@@ -83,6 +84,17 @@ class ListProdict(Prodict):
     li: List
     li_str: List[str]
     li_int: List[int]
+
+
+class ForwardNode(Prodict):
+    # string annotations, as with `from __future__ import annotations`
+    value: 'int'
+    children: 'List[ForwardNode]'
+
+
+class UnresolvedRef(Prodict):
+    later: 'NoSuchClass'  # noqa: F821
+    n: int
 
 
 class Recursive(Prodict):
@@ -803,3 +815,93 @@ class TestProdict(TestCase):
 
         m.d = Prodict(x=1)
         self.assertEqual(m.d, {'x': 1})
+
+    def test_optional_and_union_annotations(self):
+        # #38: Optional[X] converts as X; a union of several types stores the value as given
+        class M(Prodict):
+            n: Optional[int]
+            child: Optional[Ram]
+            either: Union[int, str]
+            nums: List[Optional[int]]
+
+        m = M(n='7', child={'capacity': '8'}, either='7', nums=['1', None])
+        self.assertEqual(m.n, 7)
+        self.assertIsInstance(m.child, Ram)
+        self.assertEqual(m.child.capacity, 8)
+        self.assertEqual(m.either, '7')
+        self.assertEqual(m.nums, [1, None])
+        self.assertEqual(M(either={'a': 1}).either, {'a': 1})
+        self.assertIsNone(M(n=None).n)
+
+    @unittest.skipIf(sys.version_info < (3, 10), 'X | Y annotations need Python 3.10')
+    def test_union_operator_annotations(self):
+        M = type('M', (Prodict,), {'__annotations__': {
+            'n': eval('int | None'), 'either': eval('int | str')}})
+        self.assertEqual(M(n='7').n, 7)
+        self.assertEqual(M(either='7').either, '7')
+
+    @unittest.skipIf(sys.version_info < (3, 9), 'built-in generics need Python 3.9')
+    def test_builtin_generic_annotations(self):
+        # #21: list[T], tuple[...] and dict[K, V] work like their typing forms
+        M = type('M', (Prodict,), {'__annotations__': {
+            'nums': eval('list[int]'), 'pair': eval('tuple[int, ...]'),
+            'd': eval('dict[str, int]'), 'rams': eval('list[Ram]')}})
+        m = M(nums=['1', '2'], pair=[1, 2], d={'a': 1}, rams=[{'capacity': '4'}])
+        self.assertEqual(m.nums, [1, 2])
+        self.assertEqual(m.pair, (1, 2))
+        self.assertIsInstance(m.d, Prodict)
+        self.assertIsInstance(m.rams[0], Ram)
+        self.assertEqual(m.rams[0].capacity, 4)
+        self.assertEqual(M(nums=5).nums, 5)
+
+    def test_failed_conversion_stores_value_as_given(self):
+        class M(Prodict):
+            n: int
+            f: float
+            nums: List[int]
+            seq: list
+            pair: Tuple[int, int]
+
+        m = M(n='many', f='x', nums=['1', 'two'], seq=5, pair=5)
+        self.assertEqual(m, {'n': 'many', 'f': 'x', 'nums': [1, 'two'], 'seq': 5, 'pair': 5})
+        m.n = '3'
+        self.assertEqual(m.n, 3)
+        self.assertEqual(M(n=Prodict(a=1)).n, {'a': 1})
+
+    def test_annotations_are_inherited(self):
+        class Base(Prodict):
+            id: int
+
+        class Child(Base):
+            name: str
+
+        class Empty(Base):
+            pass
+
+        self.assertEqual(Child(id='1', name=2), {'id': 1, 'name': '2'})
+        self.assertEqual(Child(), {'id': None, 'name': None})
+        self.assertEqual(Child.attr_names(), ['id', 'name'])
+        self.assertEqual(Empty(id='1').id, 1)
+
+    def test_string_annotations(self):
+        node = ForwardNode(value='1', children=[{'value': '2', 'children': []}])
+        self.assertEqual(node.value, 1)
+        self.assertIsInstance(node.children[0], ForwardNode)
+        self.assertEqual(node.children[0].value, 2)
+
+        # an annotation that cannot be resolved stores values as given; the others still convert
+        ref = UnresolvedRef(later={'a': 1}, n='2')
+        self.assertEqual(ref.later, {'a': 1})
+        self.assertEqual(ref.n, 2)
+
+    def test_prodict_values_keep_identity(self):
+        class M(Prodict):
+            child: Ram
+            any_model: Prodict
+            rams: List[Ram]
+
+        ram = Ram(capacity=4)
+        m = M(child=ram, any_model=ram, rams=[ram])
+        self.assertIs(m.child, ram)
+        self.assertIs(m.any_model, ram)
+        self.assertIs(m.rams[0], ram)

@@ -63,7 +63,9 @@ type(p.rock)    # <class 'prodict.Prodict'>
 ```
 
 **Type conversion from annotations.** Subclass `Prodict`, annotate attributes, and values
-are converted when they are set. Use `Any` to keep completion without conversion.
+are converted when they are set. Conversion is best effort: a value that cannot be
+converted is stored as given, so an annotation never makes an assignment fail. Use `Any`
+to keep completion without conversion.
 
 ```python
 from typing import Any
@@ -76,6 +78,7 @@ class Country(Prodict):
 germany = Country(name='Germany', population='83200000', raw='83200000')
 germany.population  # 83200000 (int)
 germany.raw         # '83200000' (unchanged)
+Country(population='unknown').population  # 'unknown' (stored as given)
 Country(name='Turkey')  # {'name': 'Turkey', 'population': None, 'raw': None}
 ```
 
@@ -208,15 +211,14 @@ including writing the data back out, is [examples/05-json-api-client](https://gi
 - Keys that are not valid Python identifiers (`'1'`, `'first-name'`) work with brackets and
   `set_attribute()`, not with dots.
 - Values are converted for `int`, `float`, `str`, `list`, `List[T]`, `Tuple[...]`,
+  `Optional[T]`, `dict` and `Dict[K, V]` (a plain dict becomes a `Prodict`), and
   `Prodict` and its subclasses, when set as keyword arguments, through `from_dict()` or by
-  attribute assignment. A `dict` or `Dict[K, V]` attribute turns a plain dict into a
-  `Prodict` without converting its contents. `bool`, plain `tuple` and other types are
-  stored as they come, and so is anything set with `p['key'] = ...` or `update()`.
+  attribute assignment; `list[T]`, `tuple[...]`, `dict[K, V]` and `T | None` work too.
+  `bool`, plain `tuple`, unions of several types and other annotations store values as
+  they come, and so does anything set with `p['key'] = ...` or `update()`. A value that
+  cannot be converted is stored as given.
 - Prefer keyword arguments or `from_dict()`. A dict passed positionally (`Model({...})`)
   converts annotated attributes, but its unannotated nested dicts stay plain dicts.
-- `Optional[...]`, `Union[...]`, and built-in generics such
-  as `list[int]` are not supported as annotations; use `Any`, `Prodict` or the `typing`
-  forms (`List[int]`).
 - Prodict keeps data in the dict, not in instance attributes, so avoid giving class
   attributes values meant for instances.
 
