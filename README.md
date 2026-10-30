@@ -7,7 +7,7 @@
 
 **Prodict is what Python's `dict` meant to be: keys you can reach with dots, values typed
 by your annotations, and your IDE completing every name.** It is still a real `dict`, and
-it never refuses data.
+an annotation never rejects a value.
 
 ```python
 >>> from prodict import Prodict
@@ -56,8 +56,8 @@ Declare the shape you care about, and values arrive with the right types:
   all.
 - It is a real `dict`: `json.dumps`, `==`, `**kwargs`, `isinstance(p, dict)` and every
   dict method keep working.
-- It is lenient. A value it cannot convert is stored as it is, keys you did not declare
-  are kept, and unexpected data never raises.
+- It is lenient. A value it cannot convert is stored as it is and keys you did not declare
+  are kept: an annotation never makes an assignment fail.
 - It is small: one module, no dependencies.
 
 | | `dict` | dataclass | pydantic model | **Prodict** |
@@ -106,8 +106,9 @@ A missing attribute raises `AttributeError`, so `getattr(p, 'name', default)` an
 
 ### Nested dicts become Prodicts
 
-At every level, whether the data comes in through `from_dict()`, as a positional dict or
-as keyword arguments:
+Dicts inside dicts become Prodicts too, whether the data comes in through `from_dict()`,
+as a positional dict, as keyword arguments or by assignment. (Dicts inside a list need an
+annotation such as `List[Model]`; see below.)
 
 ```python
 >>> config = Prodict({'db': {'host': 'localhost', 'port': 5432}})
@@ -151,24 +152,26 @@ attribute:
 | Annotation | Example input | Stored value |
 |---|---|---|
 | `int`, `float`, `str` | `'42'` for `int` | `42` |
-| `list`, `Tuple[...]` | `('a', 'b')` for `list` | `['a', 'b']` |
-| `List[T]` | `['1', '2']` for `List[int]` | `[1, 2]` |
-| `Optional[T]` | `'7'` for `Optional[int]` | `7` |
+| `list` | `('a', 'b')` | `['a', 'b']` |
+| `List[T]` | `['1', '2']` for `List[int]` | `[1, 2]`, each item through `T` |
+| `Tuple[...]` | `['1', '2']` | `('1', '2')`, items unchanged |
+| `Optional[T]`, `Annotated[T, ...]` | `'7'` for `Optional[int]` | `7` |
 | a Prodict subclass | `{'id': '1'}` | an instance of that class |
-| `dict`, `Dict[K, V]`, `Prodict` | `{'a': 1}` | a `Prodict` |
-| `Any`, `bool`, `Union[A, B]`, anything else | anything | unchanged |
+| `dict`, `Dict[K, V]`, `Prodict` | `{'a': '1'}` | a `Prodict`, values unchanged |
+| `Any`, `bool`, plain `tuple`, `Union[A, B]`, anything else | anything | unchanged |
 
-The built-in forms work too (`list[int]`, `dict[str, int]`, `int | None`), and so do
-string annotations and `from __future__ import annotations`. `None` is never converted,
-and `p['key'] = ...` and `update()` store values unchanged, as in any dict. The
+The built-in forms work too: `list[int]` and `dict[str, int]` on Python 3.9+, `int | None`
+on 3.10+. So do string annotations and `from __future__ import annotations`. `None` is
+never converted, and `p['key'] = ...` and `update()` store values unchanged, as in any
+dict. The
 [typed models guide](https://github.com/ramazanpolat/prodict/blob/master/docs/guides/typed-models.md)
 has the details.
 
 ### Defaults and inheritance
 
-Override `init()`, not `__init__`, to set defaults: no `super()` call is needed, and the
-data you pass in wins over them. A subclass has its base classes' attributes and
-defaults.
+Override `init()`, not `__init__`, to set defaults; the data you pass in wins over them.
+A subclass has its base classes' attributes and defaults; if it overrides `init()` too,
+it calls `super().init()` to keep them.
 
 ```python
 >>> class Settings(Prodict):
@@ -202,7 +205,7 @@ defaults.
 ```
 
 `copy.copy`, `copy.deepcopy` and `pickle` keep the model class and the data as it is.
-`dir(p)` lists the keys, so a REPL or notebook completes them too.
+`dir(p)` lists the keys that are identifiers, so a REPL or notebook completes them too.
 
 ## A real API in a few lines
 
@@ -246,10 +249,12 @@ JSON back is [examples/05-json-api-client](https://github.com/ramazanpolat/prodi
 
 - Names of `dict` methods (`items`, `keys`, `get`, ...) and of Prodict methods
   (`to_dict`, `from_dict`, `init`, ...) work as keys, but reading them with a dot returns
-  the method: use `p['items']`. Names like `__deepcopy__` are bracket-only too.
+  the method: use `p['items']`. Setting or deleting a `dict` method name with a dot
+  raises `TypeError`. Names like `__deepcopy__` are bracket-only too.
 - Keys that are not valid identifiers (`'first-name'`, `1`) cannot be read with a dot; use
   brackets, or `set_attribute()` to store a value with conversion.
-- `p['key'] = ...` and `update()` store values as they are, without conversion.
+- `p['key'] = ...`, `update()` and later changes such as `p.tags.append('4')` store
+  values as they are, without conversion.
 - Dicts inside a list stay dicts unless the list is annotated (`List[Model]`).
 - Data lives in the dict, not in instance attributes: set defaults in `init()`, not as
   class attributes, and annotate class-level settings with `ClassVar`.
