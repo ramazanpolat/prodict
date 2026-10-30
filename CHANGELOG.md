@@ -21,7 +21,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 - A Prodict assigned to an attribute annotated with its class, a base class, `dict` or
   `List[...]` of its class is stored as it is, not copied.
 - `List[dict]` items become `Prodict` instances, like a `dict` attribute, instead of
-  plain dict copies.
+  plain dict copies; an item that cannot become one (a key such as `items`) stays as
+  given.
 - `ClassVar` annotations are left out of the model: they no longer appear in every
   instance as `None`.
 - `Annotated[T, ...]` annotations convert as `T`.
@@ -39,8 +40,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 - `List[Any]`, `List[Optional[T]]` and other lists of non-class types no longer raise
   `TypeError`.
 - A dict with a key Prodict cannot hold as an attribute (`items`, `keys`, a non-string
-  key) given to a `dict` attribute or as a `List[dict]` item is stored as given instead of
-  raising `TypeError`.
+  key) given to a `dict` or `Dict[K, V]` attribute is stored as given instead of raising
+  `TypeError`.
 - String annotations, including `from __future__ import annotations`, convert values. An
   annotation that cannot be resolved stores values as given instead of raising
   `TypeError` for dicts, and does not stop the model's other annotations from converting.
