@@ -1401,7 +1401,71 @@ class TestProdict(TestCase):
             b: Strict
 
         holder = Holder(a=shared, b=shared)
-        self.assertIs(holder.a, holder.b)
+        # a custom constructor gets its own instance for each occurrence
+        self.assertIsInstance(holder.a, Strict)
+        self.assertEqual(holder.a, holder.b)
+
+    def test_from_dict_binds_named_parameters(self):
+        class Named(Prodict):
+            def __init__(self, name):
+                super().__init__(name=name)
+
+        class KeywordOnly(Prodict):
+            def __init__(self, *, name):
+                super().__init__(name=name)
+
+        class Defaults(Prodict):
+            def __init__(self, a=0, b=0):
+                super().__init__(a=a, b=b)
+
+        self.assertEqual(Named.from_dict({'name': 'Ada'}), {'name': 'Ada'})
+        self.assertEqual(KeywordOnly.from_dict({'name': 'Ada'}), {'name': 'Ada'})
+        self.assertEqual(Defaults.from_dict({'a': 1, 'b': 2}), {'a': 1, 'b': 2})
+
+    def test_from_dict_with_annotations_that_do_not_resolve(self):
+        module = make_module('prodict_test_ctor_annotations', (
+            'from prodict import Prodict\n'
+            'class C(Prodict):\n'
+            '    def __init__(self, **kw: Missing):\n'
+            '        super().__init__(**kw)\n'), future_annotations=sys.version_info < (3, 14))
+        self.assertEqual(module.C.from_dict({'a': 1}), {'a': 1})
+
+    def test_model_failing_after_base_init_is_not_reused(self):
+        class Late(Prodict):
+            x: int
+
+            def __init__(self, data):
+                super().__init__(data)
+                raise ValueError('rejected after construction')
+
+        class Holder(Prodict):
+            a: Late
+            b: Late
+
+        d = {'x': '1'}
+        holder = Holder(a=d, b=d)
+        self.assertIs(holder.a, d)
+        self.assertIs(holder.b, d)
+
+    def test_init_assigning_one_dict_twice(self):
+        settings = {'level': 1}
+
+        class Item(Prodict):
+            def init(self):
+                self.first = settings
+                self.second = settings
+
+        item = Item()
+        self.assertIsNot(item.first, item.second)
+
+    def test_self_reference_in_a_model_is_the_model(self):
+        class Node(Prodict):
+            name: str
+
+        d = {'name': 'root'}
+        d['me'] = d
+        node = Node(d)
+        self.assertIs(node.me, node)
 
     def test_failed_nested_model_is_not_reused(self):
         class Broken(Prodict):
@@ -1466,6 +1530,19 @@ class TestProdict(TestCase):
         self.assertEqual(c.total, 3)  # the cached property wins on reads
         del c.total
         self.assertEqual(c['total'], 99)
+
+    def test_delete_a_key_named_like_an_empty_slot(self):
+        s = Slotted(tag=1)
+        del s.tag
+        self.assertNotIn('tag', s)
+
+    @unittest.skipIf(sys.version_info < (3, 11), 'object.__getstate__ needs Python 3.11')
+    def test_subclass_state_from_object_getstate(self):
+        cls = type('SlottedState', (Slotted,), {'__getstate__': lambda self: object.__getstate__(self)})
+        s = cls(a=1)
+        object.__setattr__(s, 'tag', 'x')
+        clone = copy.copy(s)
+        self.assertEqual((clone.tag, clone), ('x', {'a': 1}))
 
     def test_dunder_rule(self):
         p = Prodict({'__': 1, '__x__': 2})

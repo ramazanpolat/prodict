@@ -52,11 +52,12 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   came in positionally, sets every annotated attribute to `None`, calls the `init()` hook
   (where subclasses set defaults), then stores the positional data and the keyword
   arguments again through `_store()`, which converts them. Keyword arguments win.
-  `from_dict(d)` is `cls(d)`, or `cls(**d)` for a subclass whose own `__init__` takes only
-  keyword arguments (`_takes_keywords`). A thread-local memo (`_converting`) maps each
-  dict under conversion to its Prodict, so cyclic and shared dicts stay cyclic and
-  shared; `init()` runs with an empty memo (defaults are never shared), a failed instance
-  is removed from it, and `from_dict()`'s `cls(**d)` passes its source as `pending`.
+  `from_dict(d)` is `cls(d)`, or `cls(**d)` when a subclass's own `__init__` accepts the
+  data as keyword arguments (`_takes_keywords` binds it to the signature); it is typed to
+  return `cls`. A thread-local memo (`_converting`, keyed by the source dict's id) maps
+  each dict that `Prodict(d)` converts to its instance, so cyclic and shared dicts stay
+  cyclic and shared for models with the default constructor. `init()` runs outside the
+  memo, so defaults are never shared, and a failed instance is removed from it.
 - `__getattr__` / `__setattr__` / `__delattr__` map attributes to keys. A missing key
   raises `AttributeError`, and so does any `__dunder__` name (`_is_dunder`), so that
   protocol lookups (`copy.deepcopy` asks for `__deepcopy__`) never get data.

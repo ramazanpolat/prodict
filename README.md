@@ -106,8 +106,8 @@ isinstance(computer.rams[0], Ram)  # True
 computer.total_ram()    # 16
 ```
 
-**Defaults with `init()`.** Override `init()`, not `__init__`; no `super()` call needed,
-and keyword arguments win over defaults.
+**Defaults with `init()`.** Override `init()`, not `__init__`; the data you pass in wins over
+the defaults.
 
 ```python
 class Settings(Prodict):
