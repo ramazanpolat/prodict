@@ -112,7 +112,9 @@ values, which `exclude_none_in_lists` cannot do:
 
 ## Copying and pickling
 
-`copy.deepcopy` keeps the model class and copies every nested value:
+`copy.deepcopy` keeps the model class and copies every nested value as it is stored:
+`init()` does not run again and nothing is converted again. Shared and self-referencing
+values are copied the way `deepcopy` copies them in a plain dict:
 
 ```python
 >>> import copy
@@ -122,8 +124,8 @@ values, which `exclude_none_in_lists` cannot do:
 
 ```
 
-`pickle` round-trips a model too, as long as its class is importable (defined at module
-level), the same rule as for any pickled class. See
+`pickle` round-trips a model the same way, as long as its class is importable (defined
+at module level), the same rule as for any pickled class. See
 [example 05](../../examples/05-json-api-client/main.py).
 
 `copy.copy(note)` is shallow and keeps the class; `note.copy()` is shallow and returns a

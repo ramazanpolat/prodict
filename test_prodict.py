@@ -1,4 +1,5 @@
 import __future__
+import functools
 import gc
 import pickle
 import threading
@@ -102,6 +103,50 @@ def make_module(name, source, future_annotations=False):
     flags = __future__.annotations.compiler_flag if future_annotations else 0
     exec(compile(source, name, 'exec', flags=flags, dont_inherit=True), module.__dict__)
     return module
+
+
+class Counter(Prodict):
+    # module level, so that pickle can find it
+    n: int
+    log: List[str]
+    init_calls = []
+
+    def init(self):
+        Counter.init_calls.append(1)
+        self.log = ['created']
+
+
+class Slotted(Prodict):
+    __slots__ = ('tag', '__secret')
+
+
+class Strict(Prodict):
+    # a subclass with its own constructor, keyword arguments only
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class Positional(Prodict):
+    # a subclass with its own constructor that takes the data positionally
+    def __init__(self, data):
+        super().__init__(data)
+
+
+class Point(Prodict):
+    # a subclass with its own __new__ arguments and state hooks
+    def __new__(cls, x, y):
+        return super().__new__(cls)
+
+    def __init__(self, x, y):
+        super().__init__(x=x, y=y)
+
+    def __getnewargs__(self):
+        return self['x'], self['y']
+
+
+class Session(Prodict):
+    def __getstate__(self):
+        return {'token': None}  # never save the token
 
 
 class ForwardNode(Prodict):
@@ -805,7 +850,7 @@ class TestProdict(TestCase):
         # a plain dict for a dict attribute still becomes a Prodict
         self.assertIsInstance(M(d={'a': 1}).d, Prodict)
 
-        # deepcopy re-assigns every value, including the Prodict in d
+        # deepcopy copies every value, including the Prodict in d
         m2 = M(d={'a': {'b': 2}})
         clone = copy.deepcopy(m2)
         self.assertEqual(clone, m2)
@@ -926,18 +971,17 @@ class TestProdict(TestCase):
         self.assertEqual(m.amounts, [Decimal('1.5')])
         self.assertIsInstance(m.dicts[0], Prodict)
 
-    def test_dicts_that_cannot_become_prodicts(self):
-        # keys named like dict methods, or not strings, keep the dict as given
+    def test_dicts_with_any_keys_become_prodicts(self):
+        # keys named like dict methods, and keys that are not strings, are fine
         class M(Prodict):
             d: dict
             rows: List[dict]
 
-        page, row, numbered = {'items': [1]}, {'items': 1}, {1: 'one'}
-        m = M(d=page, rows=[row, numbered, {'a': 1}])
-        self.assertIs(m.d, page)
-        self.assertIs(m.rows[0], row)
-        self.assertIs(m.rows[1], numbered)
-        self.assertIsInstance(m.rows[2], Prodict)
+        m = M(d={'items': [1]}, rows=[{'items': 1}, {1: 'one'}, {'a': 1}])
+        self.assertIsInstance(m.d, Prodict)
+        self.assertEqual(m.d['items'], [1])
+        self.assertTrue(all(type(row) is Prodict for row in m.rows))
+        self.assertEqual(m.rows[1][1], 'one')
 
     def test_list_items_that_cannot_be_converted(self):
         class TD(TypedDict):
@@ -1195,3 +1239,405 @@ class TestProdict(TestCase):
         self.assertIs(m.child, ram)
         self.assertIs(m.any_model, ram)
         self.assertIs(m.rams[0], ram)
+
+    def test_any_key_is_accepted_as_data(self):
+        # keys named like dict methods, and keys that are not strings, work as in a dict
+        page = Prodict.from_dict({'items': [1, 2], 'total': 2, 'meta': {'keys': 'a'}})
+        self.assertEqual(page['items'], [1, 2])
+        self.assertEqual(page.total, 2)
+        self.assertIsInstance(page.meta, Prodict)
+        self.assertEqual(page.meta['keys'], 'a')
+        self.assertTrue(callable(page.items))
+        self.assertEqual(Prodict(items=1)['items'], 1)
+        self.assertEqual(Prodict.from_dict({1: 'one'})[1], 'one')
+        with self.assertRaises(TypeError):
+            page.items = 1  # still not as an attribute
+
+    def test_positional_dict_is_like_from_dict(self):
+        # #42: nested dicts passed positionally become Prodicts too
+        data = {'x': 100, 'foo': {'z': 300, 'deeper': {'w': 1}}}
+        p = Prodict(data)
+        self.assertEqual(p.foo.z, 300)
+        self.assertEqual(p.foo.deeper.w, 1)
+        self.assertIs(type(p.foo), Prodict)
+        self.assertEqual(p, Prodict.from_dict(data))
+        self.assertEqual(Prodict([('foo', {'z': 1})]).foo.z, 1)
+
+    def test_prodict_values_are_not_copied(self):
+        other = Prodict(x=1)
+        p = Prodict(a=other)
+        p.b = other
+        self.assertIs(p.a, other)
+        self.assertIs(p.b, other)
+        self.assertIs(Prodict({'c': other}).c, other)
+
+    def clones(self, value):
+        # every way to copy a Prodict: copy, deepcopy and pickle with each protocol
+        yield copy.copy(value)
+        yield copy.deepcopy(value)
+        for protocol in range(pickle.HIGHEST_PROTOCOL + 1):
+            yield pickle.loads(pickle.dumps(value, protocol))
+
+    def test_copy_deepcopy_and_pickle_keep_data_as_stored(self):
+        c = Counter(n='1')
+        c['n'] = '2'        # raw, would convert to 2
+        del c['log']        # init() would put it back
+        c['items'] = [1]
+        c[3] = 'three'
+        calls = len(Counter.init_calls)
+        for clone in self.clones(c):
+            self.assertIs(type(clone), Counter)
+            self.assertEqual(clone, {'n': '2', 'items': [1], 3: 'three'})
+        self.assertEqual(len(Counter.init_calls), calls)
+        self.assertIs(copy.copy(c)['items'], c['items'])
+        self.assertIsNot(copy.deepcopy(c)['items'], c['items'])
+
+    def test_copies_keep_instance_attributes_and_slots(self):
+        p = Prodict(a=1)
+        vars(p)['note'] = 'kept'
+        s = Slotted(a=1)
+        object.__setattr__(s, 'tag', 'x')
+        object.__setattr__(s, '_Slotted__secret', 'y')
+        for clone in self.clones(p):
+            self.assertEqual(vars(clone), {'note': 'kept'})
+            self.assertEqual(clone, {'a': 1})
+        for clone in self.clones(s):
+            self.assertEqual((clone.tag, clone._Slotted__secret), ('x', 'y'))
+            self.assertEqual(clone, {'a': 1})
+
+    def test_deepcopy_and_pickle_of_shared_and_cyclic_values(self):
+        shared = Prodict(v=1)
+        p = Prodict(a=shared, b=shared)
+        p['me'] = p
+        shallow, *deep = self.clones(p)
+        self.assertIs(shallow['me'], p)  # a shallow copy points at the original, as a dict's does
+        for clone in deep:
+            self.assertIs(clone.a, clone.b)
+            self.assertIs(clone['me'], clone)
+
+    def test_cyclic_and_shared_dicts_in_data(self):
+        d = {'name': 'loop'}
+        d['me'] = d
+        for p in (Prodict(d), Prodict.from_dict(d), Prodict(wrapper=d).wrapper):
+            self.assertIs(p.me, p)
+            self.assertEqual(p.name, 'loop')
+        shared = {'v': 1}
+        both = Prodict(a=shared, b=shared)
+        self.assertEqual(both.a, both.b)  # converted once per occurrence, as before
+        self.assertIsNot(both.a, both.b)
+
+    def test_from_dict_with_a_custom_constructor(self):
+        self.assertEqual(Strict.from_dict({'x': 1}), {'x': 1})
+
+        class Holder(Prodict):
+            child: Strict
+
+        self.assertIsInstance(Holder(child={'x': 1}).child, Strict)
+
+    def test_class_attributes_named_like_dict_methods(self):
+        M = type('M', (Prodict,), {'__annotations__': {'items': list}, 'items': None})
+        m = M()
+        self.assertEqual(dict(m), {'items': None})
+        self.assertEqual(m.to_dict(), {'items': None})
+        self.assertIn('to_dict', dir(m))
+
+    def test_delete_instance_attributes(self):
+        class Cached(Prodict):
+            @functools.cached_property
+            def total(self):
+                return 3
+
+        c = Cached(a=1)
+        self.assertEqual(c.total, 3)
+        del c.total  # a cached value, not a key
+        self.assertEqual(c, {'a': 1})
+
+    def test_keys_named_like_special_methods(self):
+        hooks = {'__deepcopy__': 1, '__getstate__': 2, '__reduce_ex__': 3, '__copy__': 4}
+        p = Prodict(nested={'__deepcopy__': 5}, **hooks)
+        for clone in self.clones(p):
+            self.assertEqual(clone, p)
+        self.assertEqual(p['__deepcopy__'], 1)
+        with self.assertRaises(AttributeError):
+            p.__deepcopy__  # a special-method name is never a key lookup
+
+    def test_pickles_from_0_8_load(self):
+        # Prodict(a=1, b={'c': 2}) pickled by prodict 0.8.23 (protocol 2)
+        old = (b'\x80\x02cprodict\nProdict\nq\x00)\x81q\x01(X\x01\x00\x00\x00aq\x02K\x01X\x01\x00\x00\x00b'
+               b'q\x03h\x00)\x81q\x04X\x01\x00\x00\x00cq\x05K\x02s}q\x06h\x05K\x02sbu}q\x07(h\x02K\x01h\x03h\x04ub.')
+        p = pickle.loads(old)
+        self.assertEqual(p, {'a': 1, 'b': {'c': 2}})
+        self.assertIsInstance(p.b, Prodict)
+        self.assertEqual(vars(p), {})
+
+    def test_delete_attribute(self):
+        p = Prodict(a=1, b=2)
+        del p.a
+        self.assertEqual(p, {'b': 2})
+        with self.assertRaises(AttributeError):
+            del p.a
+        with self.assertRaises(TypeError):
+            del p.items
+
+    def test_dir_lists_keys(self):
+        p = Prodict({'alpha': 1, 'not-an-identifier': 2, 3: 'three'})
+        names = dir(p)
+        self.assertIn('alpha', names)
+        self.assertIn('to_dict', names)
+        self.assertNotIn('not-an-identifier', names)
+
+    def test_from_dict_with_other_constructors(self):
+        self.assertEqual(Positional.from_dict({'x': 1}), {'x': 1})
+        self.assertEqual(Positional.from_dict({'x': 1, 1: 'one'}), {'x': 1, 1: 'one'})
+        d = {'name': 'loop'}
+        d['me'] = d
+        strict = Strict.from_dict(d)
+        # 'me' is not annotated, so it becomes a Prodict, which contains itself
+        self.assertIs(type(strict['me']), Prodict)
+        self.assertIs(strict['me']['me'], strict['me'])
+        shared = {'x': 1}
+
+        class Holder(Prodict):
+            a: Strict
+            b: Strict
+
+        holder = Holder(a=shared, b=shared)
+        # a custom constructor gets its own instance for each occurrence
+        self.assertIsInstance(holder.a, Strict)
+        self.assertEqual(holder.a, holder.b)
+
+    def test_from_dict_binds_named_parameters(self):
+        class Named(Prodict):
+            def __init__(self, name):
+                super().__init__(name=name)
+
+        class KeywordOnly(Prodict):
+            def __init__(self, *, name):
+                super().__init__(name=name)
+
+        class Defaults(Prodict):
+            def __init__(self, a=0, b=0):
+                super().__init__(a=a, b=b)
+
+        self.assertEqual(Named.from_dict({'name': 'Ada'}), {'name': 'Ada'})
+        self.assertEqual(KeywordOnly.from_dict({'name': 'Ada'}), {'name': 'Ada'})
+        self.assertEqual(Defaults.from_dict({'a': 1, 'b': 2}), {'a': 1, 'b': 2})
+
+    def test_from_dict_with_annotations_that_do_not_resolve(self):
+        module = make_module('prodict_test_ctor_annotations', (
+            'from prodict import Prodict\n'
+            'class C(Prodict):\n'
+            '    def __init__(self, **kw: Missing):\n'
+            '        super().__init__(**kw)\n'), future_annotations=sys.version_info < (3, 14))
+        self.assertEqual(module.C.from_dict({'a': 1}), {'a': 1})
+
+    def test_model_failing_after_base_init_is_not_reused(self):
+        class Late(Prodict):
+            x: int
+
+            def __init__(self, data):
+                super().__init__(data)
+                raise ValueError('rejected after construction')
+
+        class Holder(Prodict):
+            a: Late
+            b: Late
+
+        d = {'x': '1'}
+        holder = Holder(a=d, b=d)
+        self.assertIs(holder.a, d)
+        self.assertIs(holder.b, d)
+
+    def test_init_assigning_one_dict_twice(self):
+        settings = {'level': 1}
+
+        class Item(Prodict):
+            def init(self):
+                self.first = settings
+                self.second = settings
+
+        item = Item()
+        self.assertIsNot(item.first, item.second)
+
+    def test_self_reference_in_a_model_is_the_model(self):
+        class Node(Prodict):
+            name: str
+
+        d = {'name': 'root'}
+        d['me'] = d
+        node = Node(d)
+        self.assertIs(node.me, node)
+
+    def test_failed_nested_model_is_not_reused(self):
+        class Broken(Prodict):
+            x: int
+
+            def init(self):
+                raise ValueError('cannot build')
+
+        class Holder(Prodict):
+            a: Broken
+            b: Broken
+
+        d = {'x': '1'}
+        holder = Holder(a=d, b=d)
+        self.assertIs(holder.a, d)
+        self.assertIs(holder.b, d)
+
+    def test_positional_and_keyword_data_together(self):
+        d = {'x': 1}
+        p = Prodict(d, z=d)
+        self.assertIsNot(p.z, p)
+        self.assertEqual(p.z, {'x': 1})
+
+    def test_init_defaults_are_not_shared(self):
+        defaults = {'level': 1}
+
+        class Item(Prodict):
+            def init(self):
+                self.meta = defaults
+
+        class Pair(Prodict):
+            a: Item
+            b: Item
+
+        pair = Pair(a={}, b={})
+        self.assertIsNot(pair.a.meta, pair.b.meta)
+
+    def test_copies_honor_subclass_hooks(self):
+        point = Point(1, 2)
+        session = Session(user='ada')
+        vars(session)['token'] = 'secret'
+        for clone in self.clones(point):
+            self.assertEqual(clone, {'x': 1, 'y': 2})
+            self.assertIs(type(clone), Point)
+        for clone in self.clones(session):
+            self.assertEqual(clone, {'user': 'ada'})
+            self.assertIsNone(vars(clone)['token'])
+
+    def test_private_slot_on_an_underscore_class(self):
+        cls = type('_', (Prodict,), {'__slots__': '__s'})
+        p = cls()
+        object.__setattr__(p, '__s', 7)
+        self.assertEqual(getattr(copy.copy(p), '__s'), 7)
+
+    def test_delete_prefers_instance_attributes(self):
+        class Cached(Prodict):
+            @functools.cached_property
+            def total(self):
+                return 3
+
+        c = Cached({'total': 99})
+        self.assertEqual(c.total, 3)  # the cached property wins on reads
+        del c.total
+        self.assertEqual(c['total'], 99)
+
+    def test_delete_a_key_named_like_an_empty_slot(self):
+        s = Slotted(tag=1)
+        del s.tag
+        self.assertNotIn('tag', s)
+
+    @unittest.skipIf(sys.version_info < (3, 11), 'object.__getstate__ needs Python 3.11')
+    def test_subclass_state_from_object_getstate(self):
+        cls = type('SlottedState', (Slotted,), {'__getstate__': lambda self: object.__getstate__(self)})
+        s = cls(a=1)
+        object.__setattr__(s, 'tag', 'x')
+        clone = copy.copy(s)
+        self.assertEqual((clone.tag, clone), ('x', {'a': 1}))
+
+    def test_dunder_rule(self):
+        p = Prodict({'__': 1, '__x__': 2})
+        self.assertEqual(p.__, 1)  # too short to be a special name
+        self.assertNotIn('__x__', dir(p))
+        with self.assertRaises(AttributeError):
+            del p.__x__
+        self.assertEqual(p['__x__'], 2)
+
+    def test_one_dict_as_several_models(self):
+        class A(Prodict):
+            x: int
+
+        class B(Prodict):
+            x: str
+
+        class H(Prodict):
+            a: A
+            b: B
+            raw: dict
+
+        d = {'x': '1'}
+        h = H(a=d, b=d, raw=d)
+        self.assertEqual((h.a.x, h.b.x), (1, '1'))
+        self.assertIs(type(h.raw), Prodict)
+
+    def test_cycle_through_several_models(self):
+        class Child(Prodict):
+            name: str
+
+        class Parent(Prodict):
+            child: Child
+
+        d = {'name': 'loop'}
+        d['child'] = d
+        d['me'] = d
+        parent = Parent(d)
+        self.assertIs(parent.me, parent)
+        self.assertIsInstance(parent.child, Child)
+        self.assertIs(parent.child.child, parent.child)
+
+    def test_failed_model_leaves_no_trace(self):
+        class Rejecting(Prodict):
+            def __init__(self, data):
+                super().__init__(data)
+                raise ValueError('rejected')
+
+        class H(Prodict):
+            bad: Rejecting
+
+        d = {}
+        child = {'parent': d}
+        d['child'] = child
+        h = H(bad=d, child=child)
+        self.assertIs(h.bad, d)
+        self.assertIs(type(h.child.parent), Prodict)
+
+    def test_from_dict_with_args_and_kwargs(self):
+        class Flexible(Prodict):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+
+        self.assertEqual(Flexible.from_dict({'cls': 1}), {'cls': 1})
+
+        class NamedFirst(Prodict):
+            def __init__(self, name, *args, **kwargs):
+                super().__init__(*args, name=name, **kwargs)
+
+        class KeywordAfterArgs(Prodict):
+            def __init__(self, *args, name, **kwargs):
+                super().__init__(*args, name=name, **kwargs)
+
+        self.assertEqual(NamedFirst.from_dict({'name': 'Ada', 'age': 30}), {'name': 'Ada', 'age': 30})
+        self.assertEqual(KeywordAfterArgs.from_dict({'name': 'Ada'}), {'name': 'Ada'})
+        self.assertEqual(Flexible.from_dict({'self': 2}), {'self': 2})
+
+    def test_delete_a_read_only_property(self):
+        class R(Prodict):
+            @property
+            def p(self):
+                return 3
+
+        r = R({'p': 99})
+        with self.assertRaises(AttributeError):
+            del r.p
+        self.assertEqual(r['p'], 99)
+
+    def test_conversion_that_recurses_keeps_the_value(self):
+        class Endless:
+            def __int__(self):
+                return int(self)
+
+        class M(Prodict):
+            n: int
+
+        value = Endless()
+        self.assertIs(M(n=value).n, value)
