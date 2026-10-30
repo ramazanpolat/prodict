@@ -209,12 +209,12 @@ including writing the data back out, is [examples/05-json-api-client](https://gi
   `set_attribute()`, not with dots.
 - Values are converted for `int`, `float`, `str`, `list`, `List[T]`, `Tuple[...]`,
   `Prodict` and its subclasses, when set as keyword arguments, through `from_dict()` or by
-  attribute assignment. `bool`, plain `tuple` and other types are stored as they come (a
-  Prodict value for them raises `AttributeError`), and so is anything set with
-  `p['key'] = ...` or `update()`.
+  attribute assignment. A `dict` or `Dict[K, V]` attribute turns a plain dict into a
+  `Prodict` without converting its contents. `bool`, plain `tuple` and other types are
+  stored as they come, and so is anything set with `p['key'] = ...` or `update()`.
 - Prefer keyword arguments or `from_dict()`. A dict passed positionally (`Model({...})`)
   converts annotated attributes, but its unannotated nested dicts stay plain dicts.
-- `Optional[...]`, `Union[...]`, `Dict[K, V]`, a bare `dict`, and built-in generics such
+- `Optional[...]`, `Union[...]`, and built-in generics such
   as `list[int]` are not supported as annotations; use `Any`, `Prodict` or the `typing`
   forms (`List[int]`).
 - Prodict keeps data in the dict, not in instance attributes, so avoid giving class

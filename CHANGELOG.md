@@ -16,6 +16,12 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 - A dict passed positionally (`Model({...})`) no longer loses the values of annotated
   attributes; they are converted like keyword arguments, which still take precedence
   ([#55](https://github.com/ramazanpolat/prodict/issues/55)).
+- Assigning a Prodict to an attribute annotated with `dict`, `bool`, `tuple`, `List[T]`
+  or `Tuple[...]` no longer raises `AttributeError`, so `copy.deepcopy()` works on models
+  with a `dict` attribute ([#56](https://github.com/ramazanpolat/prodict/issues/56)).
+- `typing.Dict` and `Dict[K, V]` annotations accept dict values and convert them to
+  `Prodict` like `dict` does, instead of raising `TypeError`
+  ([#57](https://github.com/ramazanpolat/prodict/issues/57)).
 
 ## [0.8.23] - 2026-10-27
 
