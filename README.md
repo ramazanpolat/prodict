@@ -79,7 +79,7 @@ Declare the fields you care about, and values are converted on the way in:
 | Nested data becomes your classes | no | no | yes | **yes** |
 | `'42'` becomes `42` for an `int` field | no | no | yes | **yes** |
 | Undeclared keys are kept | yes | no | if configured | **yes** |
-| A value of the wrong type raises an error | no | no | yes | **no, it is kept** |
+| A value that cannot be converted raises an error | no | no | yes | **no, it is kept** |
 | Dependencies | none | none | a few | **none** |
 
 If bad input should be rejected with an error, use a validation library such as
@@ -162,8 +162,8 @@ attribute:
 
 On Python 3.9+, `list[int]`, `tuple[int, ...]`, `dict[str, int]` and
 `Annotated[int, ...]` work too, and on 3.10+, `int | None`. String annotations and
-`from __future__ import annotations` work as well (on 3.9 and 3.10, write
-`List['Node']` rather than `list['Node']`). `None` is never converted. The
+`from __future__ import annotations` work as well (for a quoted name inside a built-in
+generic on 3.9 and 3.10, write `List['Node']` rather than `list['Node']`). `None` is never converted. The
 [typed models guide](https://github.com/ramazanpolat/prodict/blob/master/docs/guides/typed-models.md)
 has the details.
 
@@ -204,10 +204,11 @@ it calls `super().init()` to keep them.
 
 ```
 
-`to_dict()` works on the top level; `is_recursive=True` converts nested models too (see
-the [serialization guide](https://github.com/ramazanpolat/prodict/blob/master/docs/guides/serialization.md)).
+`to_dict()` works on the top level; `is_recursive=True` converts nested models too, and
+`convert_list_items=True` the models inside lists (see the
+[serialization guide](https://github.com/ramazanpolat/prodict/blob/master/docs/guides/serialization.md)).
 `copy.copy`, `copy.deepcopy` and `pickle` keep the model class and the data as it is,
-while `p.copy()` returns a plain `dict`, as for any dict subclass. `dir(p)` lists the
+while `p.copy()` is `dict.copy()` and returns a plain `dict`. `dir(p)` lists the
 keys that are identifiers, so a REPL or notebook completes them too.
 
 ## A real API in a few lines
@@ -238,7 +239,7 @@ class Repo(Prodict):
 
 repo = Repo.from_dict(requests.get('https://api.github.com/repos/ramazanpolat/prodict').json())
 repo.owner.login        # 'ramazanpolat', and your IDE completed it
-repo.license.spdx_id    # 'MIT' (license is None for a repository without one)
+repo.license and repo.license.spdx_id   # 'MIT'; license is None for some repositories
 repo.description        # not declared, still there
 repo.owner.html_url     # undeclared nested fields too
 json.dumps(repo)        # back to JSON, every field included
