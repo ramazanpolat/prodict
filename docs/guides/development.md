@@ -21,8 +21,8 @@ pip install -e . --group dev
 pytest
 ```
 
-pip dropped Python 3.8 before it learned `--group`, so on 3.8 install pytest directly:
-`pip install -e . 'pytest>=7'`.
+pip dropped Python 3.8 before it learned `--group`, so on 3.8 install the tools directly:
+`pip install -e . 'pytest>=7' 'coverage[toml]>=7'`.
 
 ## Layout
 
@@ -32,7 +32,7 @@ pip dropped Python 3.8 before it learned `--group`, so on 3.8 install pytest dir
 | `test_prodict.py` | Unit tests. |
 | `docs/` | Tutorial and guides. Their `>>>` blocks are doctests. |
 | `examples/` | Runnable examples, each with a README showing its exact output. |
-| `.github/workflows/pythonapp.yml` | CI: test matrix, build, deploy. |
+| `.github/workflows/pythonapp.yml` | CI: test matrix, combined coverage, build, deploy. |
 
 ## Tests
 
@@ -49,6 +49,23 @@ the doc tests fail otherwise. Example READMEs show each example's exact output, 
 them along with `main.py`.
 
 CI runs the same commands on every Python version from 3.8 to 3.15.
+
+## Coverage
+
+Every line and branch of `prodict/__init__.py` is covered by the tests. Some lines run only
+on some Python versions (3.8 and 3.9 fallbacks, `annotationlib` on 3.14+), so coverage is
+measured on each version and combined; CI fails below 100% (`fail_under` in
+`[tool.coverage.report]`).
+
+```bash
+for v in 3.8 3.9 3.10 3.11 3.12 3.13 3.14 3.15; do
+  COVERAGE_FILE=.coverage.$v uv run --python $v coverage run -m pytest -q
+done
+uv run coverage combine && uv run coverage report
+```
+
+On one interpreter, `uv run coverage run -m pytest && uv run coverage report` lists the
+lines that interpreter leaves out; the lines for other versions show up there as missing.
 
 ## Lint
 

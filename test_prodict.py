@@ -149,6 +149,28 @@ class Session(Prodict):
         return {'token': None}  # never save the token
 
 
+class Tagged(Prodict):
+    # a subclass whose __new__ takes a keyword-only argument
+    def __new__(cls, *args, tag, **kwargs):
+        return super().__new__(cls)
+
+    def __init__(self, *args, tag, **kwargs):
+        super().__init__(*args, **kwargs)
+        vars(self)['tag'] = tag
+
+    def __getnewargs_ex__(self):
+        return (), {'tag': vars(self)['tag']}
+
+
+class WeakrefSlot:
+    __slots__ = ('__weakref__',)
+
+
+class WithWeakrefSlot(Prodict, WeakrefSlot):
+    # a mixin's __slots__ may name __weakref__, which is not data
+    pass
+
+
 class ForwardNode(Prodict):
     # string annotations, as with `from __future__ import annotations`
     value: 'int'
@@ -1165,6 +1187,22 @@ class TestProdict(TestCase):
         self.assertIs(module.Owner.attr_types()['Pet'], module.Pet)
         self.assertIs(module.BrokenOwner.attr_types()['Pet'], module.Pet)
 
+    def test_fallback_resolves_names_like_get_type_hints(self):
+        # a name from the class body: get_type_hints() finds it from Python
+        # 3.10 on, and so does the fallback when another annotation fails
+        module = make_module('prodict_test_class_names', (
+            'from prodict import Prodict\n'
+            'class Fine(Prodict):\n'
+            '    Unit = int\n'
+            '    size: Unit\n'
+            'class Broken(Prodict):\n'
+            '    Unit = int\n'
+            '    size: Unit\n'
+            '    other: Missing\n'), future_annotations=True)
+        expected = 3 if sys.version_info >= (3, 10) else '3'
+        self.assertEqual(module.Fine(size='3').size, expected)
+        self.assertEqual(module.Broken(size='3').size, expected)
+
     def test_forward_reference_from_threads(self):
         module = make_module('prodict_test_threads', (
             'from prodict import Prodict\n'
@@ -1641,3 +1679,152 @@ class TestProdict(TestCase):
 
         value = Endless()
         self.assertIs(M(n=value).n, value)
+
+    def test_copies_honor_getnewargs_ex(self):
+        tagged = Tagged({'a': 1}, tag='t')
+        for clone in self.clones(tagged):
+            self.assertIs(type(clone), Tagged)
+            self.assertEqual(clone, {'a': 1})
+            self.assertEqual(vars(clone), {'tag': 't'})
+
+    def test_copies_with_weakref_and_empty_slots(self):
+        w = WithWeakrefSlot(a=1)
+        s = Slotted(a=1)  # its slots are never set
+        for clone in list(self.clones(w)) + list(self.clones(s)):
+            self.assertEqual(clone, {'a': 1})
+        self.assertIs(weakref.ref(w)(), w)
+        for clone in self.clones(s):
+            with self.assertRaises(AttributeError):
+                object.__getattribute__(clone, 'tag')
+
+    def test_delete_an_empty_slot_without_a_key(self):
+        s = Slotted(a=1)
+        with self.assertRaises(AttributeError):
+            del s.tag
+        self.assertEqual(s, {'a': 1})
+
+    def test_bare_list_and_tuple_annotations(self):
+        class Bare(Prodict):
+            items: List
+            pair: Tuple
+            pairs: Tuple[int, ...]
+
+        b = Bare(items=('a', 'b'), pair=['x', 'y'])
+        self.assertEqual((b['items'], b.pair), (['a', 'b'], ('x', 'y')))
+        mapping = {'k': 'v'}
+        b = Bare(pair=mapping, pairs=mapping)
+        self.assertIs(b.pair, mapping)  # a mapping is stored as given, not turned into its keys
+        self.assertIs(b.pairs, mapping)
+        self.assertEqual(Bare(pair=5).pair, 5)
+
+    def test_list_items_that_already_have_the_type(self):
+        class Prices(Prodict):
+            amounts: List[Decimal]
+            flags: List[bool]
+
+        price = Decimal('1.50')
+        p = Prices(amounts=[price, '2'], flags=[True, 0])
+        self.assertIs(p.amounts[0], price)
+        self.assertEqual(p.amounts[1], Decimal('2'))
+        self.assertEqual(p.flags, [True, False])
+        self.assertIs(p.flags[0], True)
+
+    def test_class_var_strings_that_do_not_resolve(self):
+        module = make_module('prodict_test_unresolved_class_vars', (
+            'import typing\n'
+            'from typing import ClassVar\n'
+            'from prodict import Prodict\n'
+            'class M(Prodict):\n'
+            '    shared: "ClassVar[Missing]"\n'
+            '    qualified: "typing.ClassVar[Missing]"\n'
+            '    bare: "ClassVar"\n'
+            '    later: "Missing"\n'
+            '    n: int\n'))
+        self.assertEqual(module.M.attr_names(), ['later', 'n'])
+        self.assertEqual(module.M(later='x', n='1'), {'later': 'x', 'n': 1})
+
+    @unittest.skipIf(sys.version_info < (3, 9), 'Annotated needs Python 3.9')
+    def test_annotated_annotations_that_do_not_resolve(self):
+        module = make_module('prodict_test_unresolved_annotated', (
+            'from typing import Annotated, ClassVar\n'
+            'from prodict import Prodict\n'
+            'class M(Prodict):\n'
+            '    later: Annotated["Missing", "meta"]\n'
+            '    shared: Annotated["ClassVar[Missing]", "meta"]\n'
+            '    n: int\n'))
+        self.assertEqual(module.M.attr_names(), ['later', 'n'])
+        self.assertEqual(module.M(later='x', n='1'), {'later': 'x', 'n': 1})
+        exec('class Missing(Prodict):\n    v: int\n', module.__dict__)
+        later = module.M(later={'v': '2'}).later  # resolved once the class exists
+        self.assertIs(type(later), module.Missing)
+        self.assertEqual(later, {'v': 2})
+        self.assertEqual(module.M.attr_names(), ['later', 'n'])
+
+    def test_class_helpers(self):
+        class Defaults(Prodict):
+            count: int = 5
+            name: str
+
+        self.assertTrue(Defaults.attr_has_default_value('count'))
+        self.assertFalse(Defaults.attr_has_default_value('name'))
+        self.assertEqual(Defaults.get_attr_default_value('count'), 5)
+        self.assertIsNone(Defaults.get_attr_default_value('name'))
+        self.assertIs(Defaults.attr_type('count'), int)
+        self.assertTrue(Defaults.has_attr('name'))
+        self.assertFalse(Defaults.has_attr('other'))
+        with self.assertRaises(KeyError):
+            Defaults.attr_type('other')
+
+    def test_set_default(self):
+        class Defaults(Prodict):
+            count: int = 5
+            name: str
+
+        d = Defaults(count='1', name='x')
+        self.assertEqual(d, {'count': 1, 'name': 'x'})
+        d.set_default('count')
+        self.assertEqual(d, {'count': 5, 'name': 'x'})
+        d.set_default('name')  # no class attribute: nothing changes
+        self.assertEqual(d, {'count': 5, 'name': 'x'})
+        with self.assertRaises(TypeError):
+            d.set_default('items')
+        self.assertNotIn('items', d)
+
+    def test_set_attributes(self):
+        class Typed(Prodict):
+            count: int
+
+        t = Typed()
+        t.set_attributes(count='7', self='me', extra={'a': 1})
+        self.assertEqual(t, {'count': 7, 'self': 'me', 'extra': {'a': 1}})
+        self.assertIsInstance(t.extra, Prodict)
+        with self.assertRaises(TypeError):
+            t.set_attributes(keys=1)
+
+    def test_attr_types_computed_while_waiting_for_the_lock(self):
+        # double-checked locking: a thread that finds no entry, then waits for
+        # the lock while another thread stores one, uses the stored entry
+        class Late(Prodict):
+            n: int
+
+        real_lock, waiting = prodict._attr_types_lock, threading.Event()
+
+        class SignallingLock:
+            def __enter__(self):
+                waiting.set()
+                real_lock.acquire()
+
+            def __exit__(self, *exc):
+                real_lock.release()
+
+        results = []
+        with mock.patch.object(prodict, '_attr_types_lock', SignallingLock()):
+            with mock.patch.object(prodict, '_collect_annotations', wraps=prodict._collect_annotations) as collect:
+                with real_lock:
+                    thread = threading.Thread(target=lambda: results.append(Late.attr_types()))
+                    thread.start()
+                    self.assertTrue(waiting.wait(10))
+                    self.assertEqual(Late.attr_types(), {'n': int})  # stores the entry
+                thread.join(10)
+        self.assertEqual(results, [{'n': int}])
+        self.assertEqual(collect.call_count, 1)  # the waiting thread did not collect again

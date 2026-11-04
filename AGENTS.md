@@ -28,12 +28,13 @@ Requires [uv](https://docs.astral.sh/uv/). No other setup:
 uv run pytest                                        # unit tests + doctests in docs/
 for e in examples/*/main.py; do uv run python "$e"; done
 uv run --python 3.8 pytest                           # any other supported version
+uv run coverage run -m pytest && uv run coverage report   # coverage on one version
 uvx flake8 . --select=E9,F63,F7,F82                  # the lint CI enforces
 uv build && uvx twine check dist/*                   # sdist + wheel
 ```
 
 Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
-`pip install -e . 'pytest>=7'`), then `pytest`.
+`pip install -e . 'pytest>=7' 'coverage[toml]>=7'`), then `pytest`.
 
 ## Rules for changes
 
@@ -104,9 +105,13 @@ and `p['key'] = ...` / `update()` store values without conversion.
 `.github/workflows/pythonapp.yml` runs on pull requests (including from forks) and on pushes
 to `master`:
 
-- `test`: for each Python 3.8-3.15, `uv run --managed-python pytest`, then every example.
+- `test`: for each Python 3.8-3.15, `uv run --managed-python coverage run -m pytest`, then
+  every example.
+- `coverage`: combines the coverage data of every version and fails below 100% line and
+  branch coverage. Lines that run only on some versions are covered by those versions, so
+  new code needs tests on the versions that run it; the library uses no `# pragma: no cover`.
 - `build`: flake8 (errors fail, the rest is reported), `uv build`, `twine check`.
-- `deploy` (only on a push to `master`, after both): builds, then checks PyPI for the version in
+- `deploy` (only on a push to `master`, after the other three): builds, then checks PyPI for the version in
   `pyproject.toml`. If it is new, uploads to TestPyPI and then PyPI with tokens from the
   `TESTPYPI_TOKEN` / `PYPI_TOKEN` secrets via `TWINE_PASSWORD`. If it exists, it stops.
 

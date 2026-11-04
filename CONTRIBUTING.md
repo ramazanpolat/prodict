@@ -20,8 +20,10 @@ Security problems go through private reporting instead; see [SECURITY.md](SECURI
    uv run pytest
    ```
 
-3. Add or update tests in `test_prodict.py` for behavior changes. If the change affects
-   documented behavior, update `docs/` and `examples/` too; their code runs in CI.
+3. Add or update tests in `test_prodict.py` for behavior changes. CI requires every line
+   and branch of the library to be covered (see
+   [Coverage](docs/guides/development.md#coverage)). If the change affects documented
+   behavior, update `docs/` and `examples/` too; their code runs in CI.
 4. Add a line under `Unreleased` in [CHANGELOG.md](CHANGELOG.md).
 5. Open a pull request. CI runs the tests on Python 3.8 through 3.15.
 
