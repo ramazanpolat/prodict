@@ -54,12 +54,14 @@ p               # {'lang': 'Python', 'pros': 'Rocks!', 'year': 1991}
 isinstance(p, dict)  # True
 ```
 
-**Nested dicts become Prodicts.**
+**Nested dicts become Prodicts,** whether the data comes in through `from_dict()`, as a
+positional dict, or as keyword arguments.
 
 ```python
 p = Prodict.from_dict({'package': 'Prodict', 'rock': {'even': 'more!'}})
 p.rock.even     # 'more!'
 type(p.rock)    # <class 'prodict.Prodict'>
+Prodict({'rock': {'even': 'more!'}}).rock.even  # 'more!'
 ```
 
 **Type conversion from annotations.** Subclass `Prodict`, annotate attributes, and values
@@ -104,8 +106,8 @@ isinstance(computer.rams[0], Ram)  # True
 computer.total_ram()    # 16
 ```
 
-**Defaults with `init()`.** Override `init()`, not `__init__`; no `super()` call needed,
-and keyword arguments win over defaults.
+**Defaults with `init()`.** Override `init()`, not `__init__`; the data you pass in wins over
+the defaults.
 
 ```python
 class Settings(Prodict):
@@ -205,21 +207,19 @@ including writing the data back out, is [examples/05-json-api-client](https://gi
 
 ## Limitations
 
-- Names of `dict` methods (`items`, `keys`, `get`, ...) cannot be attributes. Names of
-  Prodict methods (`to_dict`, `from_dict`, `init`, ...) can be stored but are only readable
-  with brackets, so avoid them.
+- Names of `dict` methods (`items`, `keys`, `get`, ...) work as keys (`p['items']`,
+  `from_dict({'items': ...})`) but not as attributes. Names of Prodict methods (`to_dict`,
+  `from_dict`, `init`, ...) can be stored but are only readable with brackets.
 - Keys that are not valid Python identifiers (`'1'`, `'first-name'`) work with brackets and
   `set_attribute()`, not with dots.
 - Values are converted for `int`, `float`, `str`, `list`, `List[T]`, `Tuple[...]`,
   `Optional[T]`, `dict` and `Dict[K, V]` (a plain dict becomes a `Prodict`), and
-  `Prodict` and its subclasses, when set as keyword arguments, through `from_dict()` or by
-  attribute assignment; `list[T]`, `tuple[...]`, `dict[K, V]`, `T | None` and
+  `Prodict` and its subclasses, when set through the constructor (keyword arguments or a
+  positional dict), `from_dict()` or attribute assignment; `list[T]`, `tuple[...]`, `dict[K, V]`, `T | None` and
   `Annotated[T, ...]` work too.
   `bool`, plain `tuple`, unions of several types and other annotations store values as
   they come, and so does anything set with `p['key'] = ...` or `update()`. A value that
   cannot be converted is stored as given.
-- Prefer keyword arguments or `from_dict()`. A dict passed positionally (`Model({...})`)
-  converts annotated attributes, but its unannotated nested dicts stay plain dicts.
 - Prodict keeps data in the dict, not in instance attributes, so avoid giving class
   attributes values meant for instances.
 

@@ -31,8 +31,9 @@ Every annotated attribute exists from the start, with the value `None` until you
 
 ## What is converted
 
-Conversion happens when a value goes through Prodict: keyword arguments to the
-constructor, `from_dict()`, attribute assignment (`p.price = ...`) and `set_attribute()`.
+Conversion happens when a value goes through Prodict: the constructor (keyword arguments
+or a positional dict), `from_dict()`, attribute assignment (`p.price = ...`) and
+`set_attribute()`.
 Plain dict operations, `p['price'] = ...` and `p.update(...)`, store the value as it is.
 
 | Annotation | Conversion | Example input | Stored value |
@@ -135,7 +136,8 @@ A subclass of a model has the annotations of its base classes too:
 ## Unannotated keys
 
 Keys without an annotation are allowed on any model and stored without conversion,
-except that dicts become `Prodict` instances:
+except that plain dicts become `Prodict` instances, at every level. A Prodict is stored
+as it is, not copied:
 
 ```python
 >>> p = Product(name='pen', color='blue', size={'cm': 14})
@@ -147,8 +149,8 @@ except that dicts become `Prodict` instances:
 ## Passing data in
 
 Give a model its data as keyword arguments, through `from_dict()`, or as a positional
-dict. Annotated attributes are converted the same way in each case, and keyword arguments
-win over a positional dict:
+dict, like a dict. All three are treated the same way: annotated attributes are
+converted, nested dicts become Prodicts, and keyword arguments win over a positional dict:
 
 ```python
 >>> class Point(Prodict):
@@ -158,13 +160,15 @@ win over a positional dict:
 ({'x': 1}, {'x': 1}, {'x': 1})
 >>> Point({'x': '1'}, x='2')
 {'x': 2}
+>>> Point({'x': '1', 'label': {'text': 'origin'}}).label.text
+'origin'
 
 ```
 
 ## Default values
 
-Override `init()` to set defaults. It runs inside the constructor before the keyword
-arguments are applied, so keyword arguments win:
+Override `init()` to set defaults. It runs inside the constructor before the data you
+pass in (keyword arguments or a positional dict) is applied, so the data wins:
 
 ```python
 >>> class Settings(Prodict):
@@ -182,13 +186,17 @@ arguments are applied, so keyword arguments win:
 
 `init()` runs for every instance, so mutable defaults such as lists are never shared.
 
-## Names you cannot use
+## Names that are keys but not attributes
 
 - **Names of `dict` methods** (`items`, `keys`, `values`, `get`, `update`, `copy`, ...)
-  cannot be attributes. Setting one raises `TypeError`.
+  work as keys, as in any dict: in the data you pass in and with brackets. They cannot be
+  attributes: reading `p.items` returns the method, and setting or deleting one with a
+  dot raises `TypeError`.
 - **Names of Prodict methods** (`to_dict`, `from_dict`, `init`, `set_attribute`, ...)
   can be set, but reading them with a dot still returns the method; only `p['to_dict']`
   reaches the value. Avoid them.
+- **Names like `__deepcopy__`**, with two leading and trailing underscores, belong to
+  Python's own protocols: as keys they are only reachable with brackets.
 - **Keys that are not valid identifiers** (`'1'`, `'first-name'`) cannot be reached with a
   dot, but still work with brackets or `set_attribute()`:
 
@@ -197,7 +205,10 @@ arguments are applied, so keyword arguments win:
 >>> p.set_attribute('first-name', 'Ada')
 >>> p['first-name']
 'Ada'
->>> p.items = 1
+>>> page = Prodict.from_dict({'items': [1, 2], 'total': 2})
+>>> page['items'], page.total
+([1, 2], 2)
+>>> page.items = 1
 Traceback (most recent call last):
     ...
 TypeError: You cannot set a reserved name as attribute

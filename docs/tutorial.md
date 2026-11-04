@@ -98,8 +98,9 @@ plain dicts in the input become instances of that class:
 
 ## 5. Give attributes defaults
 
-Override `init()` (not `__init__`). Prodict calls it before applying the keyword
-arguments, so they win, and you never call `super()`:
+Override `init()` (not `__init__`). Prodict calls it before applying the data you pass
+in, keyword arguments or a positional dict, so the data wins, and you never call
+`super()`:
 
 ```python
 >>> class Settings(Prodict):
