@@ -359,13 +359,11 @@ class Prodict(dict):
                 _store(self, k, v)
         finally:
             if source is not None:
-                entries = active.get(id(source), [])
-                for index in range(len(entries) - 1, -1, -1):
-                    if entries[index][1] is self:
-                        del entries[index]  # this constructor's own entry
-                        break
+                # conversions nest, so this constructor's own entry is the last one
+                entries = active[id(source)]
+                entries.pop()
                 if not entries:
-                    active.pop(id(source), None)
+                    del active[id(source)]
 
     def init(self):
         ...
@@ -475,13 +473,11 @@ class Prodict(dict):
         return attr_name in cls.attr_types()
 
     def set_default(self, attr_name):
+        # stores the class attribute of that name, as it is, as the key's value
         if self.attr_has_default_value(attr_name):
-            attr_default_type = self.attr_type(attr_name)
-            attr_default_value = self.get_attr_default_value(attr_name)
-            delattr(self, attr_name)
-            self.__annotations__[attr_name] = attr_default_type
-            self.set_attribute(attr_name, None)
-            self.update({attr_name: attr_default_value})
+            if attr_name in DICT_RESERVED_KEYS:
+                raise TypeError("You cannot set a reserved name as attribute")
+            dict.__setitem__(self, attr_name, self.get_attr_default_value(attr_name))
 
     def set_attribute(self, attr_name, value):
         if attr_name in DICT_RESERVED_KEYS:

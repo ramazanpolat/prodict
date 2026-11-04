@@ -76,6 +76,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 - `typing.Dict` and `Dict[K, V]` annotations accept dict values and convert them to
   `Prodict` like `dict` does, instead of raising `TypeError`
   ([#57](https://github.com/ramazanpolat/prodict/issues/57)).
+- `set_default(name)` stores the class attribute `name` as the key's value instead of
+  raising `AttributeError`.
 
 ## [0.8.23] - 2026-10-27
 
