@@ -9,7 +9,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 ## [0.9.0] - 2026-11-10
 
 Prodict becomes lenient and more dict-like: an annotation converts a value when it can
-and stores it as given when it cannot, and a Prodict accepts any data a `dict` accepts.
+and stores it as given when it cannot, and a Prodict takes the same data a `dict` takes:
+keys of any kind, a positional dict or pairs, and keyword arguments.
 See *Upgrading from 0.8* in the README for what you may notice.
 
 ### Added
@@ -40,7 +41,8 @@ See *Upgrading from 0.8* in the README for what you may notice.
   the data as keyword arguments): a positional dict, keyword arguments and `from_dict()`
   are treated the same way.
 - A dict that contains itself becomes a Prodict that contains itself, instead of raising
-  `RecursionError`.
+  `RecursionError`. Through a subclass whose own `__init__` takes the data as keyword
+  arguments, it is converted down to Python's recursion limit and stored as given below.
 - A nested model whose constructor raises keeps its dict as given, like any other value
   that cannot be converted.
 - `copy`, `copy.deepcopy()` and `pickle` restore the data as it is stored: `init()` does
@@ -48,7 +50,9 @@ See *Upgrading from 0.8* in the README for what you may notice.
   kept.
 - Names of the form `__name__` are never looked up as keys by attribute access, so a key
   such as `__deepcopy__` cannot stand in for a Python protocol hook; read it with
-  brackets.
+  brackets. Set with a dot (`p.__note__ = 1`), such a name is an ordinary attribute, not
+  a key, so a `Generic` model called as `Page[int](...)` no longer gets an
+  `__orig_class__` key and `json.dumps()` works on it.
 - `ClassVar` annotations are left out of the model: they no longer appear in every
   instance as `None`.
 - `Annotated[T, ...]` annotations convert as `T`.
@@ -61,7 +65,8 @@ See *Upgrading from 0.8* in the README for what you may notice.
   ([#38](https://github.com/ramazanpolat/prodict/issues/38)). Unions of several types store
   values as given instead of raising `AttributeError` on Python 3.14+.
 - The built-in generics `list[T]`, `tuple[...]` and `dict[K, V]` work like `List[T]`,
-  `Tuple[...]` and `Dict[K, V]` instead of raising `KeyError` or `TypeError`
+  `Tuple[...]` and `Dict[K, V]` instead of raising `KeyError` or `TypeError`, or storing
+  values unconverted
   ([#21](https://github.com/ramazanpolat/prodict/issues/21)).
 - `List[Any]`, `List[Optional[T]]` and other lists of non-class types no longer raise
   `TypeError`.
@@ -86,6 +91,11 @@ See *Upgrading from 0.8* in the README for what you may notice.
   ([#57](https://github.com/ramazanpolat/prodict/issues/57)).
 - `set_default(name)` stores the class attribute `name` as the key's value instead of
   raising `AttributeError`.
+- A bare `list` annotation stores a mapping as given, like `List`, instead of turning it
+  into a list of its keys.
+- A dict that cannot be converted to a Prodict, such as data nested deeper than Python's
+  recursion limit or a dict subclass whose iteration fails, is stored as given instead
+  of raising `RecursionError` or the subclass's error.
 
 ## [0.8.23] - 2026-10-27
 

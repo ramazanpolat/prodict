@@ -28,8 +28,9 @@ Releases are published by CI. Merging to `master` publishes to PyPI exactly when
    gh release create v0.9.0 --title "prodict 0.9.0" --notes-file notes.md
    ```
 
-A push to `master` that does not change the version publishes nothing, so documentation
-and CI changes can be merged at any time.
+A push to `master` publishes only when its version is not on PyPI yet. Once a release is
+on PyPI, documentation and CI changes can be merged at any time; while a release's
+`deploy` has not uploaded it, the next push to `master` would publish it instead.
 
 ## Credentials
 

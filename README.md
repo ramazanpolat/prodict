@@ -208,8 +208,8 @@ it calls `super().init()` to keep them.
 `convert_list_items=True` the models inside lists (see the
 [serialization guide](https://github.com/ramazanpolat/prodict/blob/master/docs/guides/serialization.md)).
 `copy.copy`, `copy.deepcopy` and `pickle` keep the model class and the data as it is,
-while `p.copy()` is `dict.copy()` and returns a plain `dict`. `dir(p)` lists the
-keys that are identifiers, so a REPL or notebook completes them too.
+while `p.copy()` and `p | other` are the `dict` operations and return a plain `dict`.
+`dir(p)` lists the keys that work as attributes, so a REPL or notebook completes them too.
 
 ## A real API in a few lines
 
@@ -255,12 +255,13 @@ reads JSON into typed models, computes with them and writes JSON back is
 - Names of `dict` methods (`items`, `keys`, `get`, ...) and of Prodict methods
   (`to_dict`, `from_dict`, `init`, ...) work as keys, but reading them with a dot returns
   the method: use `p['items']`. Setting or deleting a `dict` method name with a dot
-  raises `TypeError`. Names like `__deepcopy__` are bracket-only too.
+  raises `TypeError`. Names like `__deepcopy__` are bracket-only too; set with a dot,
+  they are ordinary attributes, not keys.
 - Keys that are not valid identifiers (`'first-name'`, `1`) or are Python keywords
   (`'class'`, `'from'`) cannot be used with a dot; use brackets, or `set_attribute()` to
   store a value with conversion.
-- `p['key'] = ...`, `update()` and later changes such as `p.tags.append('4')` store
-  values as they are, without conversion.
+- `p['key'] = ...`, `update()`, `setdefault()`, `|=`, `fromkeys()` and later changes
+  such as `p.tags.append('4')` store values as they are, without conversion.
 - Data lives in the dict, not in instance attributes: set defaults in `init()`, not as
   class attributes, and annotate class-level settings with `ClassVar`.
 
@@ -277,6 +278,10 @@ reads JSON into typed models, computes with them and writes JSON back is
 - A Prodict you pass in is stored as it is, not copied, when the field is unannotated or
   it already has the annotated class; `deepcopy` and `pickle` no longer run `init()` or
   convert values again.
+- The items of `List[dict]` become Prodicts.
+- `from_dict(d)` passes `d` positionally to a subclass whose own `__init__` takes
+  `*args, **kwargs`; it still passes keyword arguments to an `__init__` that names them.
+- `p.__name__ = ...` style assignments set an attribute instead of storing a key.
 
 The [changelog](https://github.com/ramazanpolat/prodict/blob/master/CHANGELOG.md) lists
 every change.

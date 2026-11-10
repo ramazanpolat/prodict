@@ -109,7 +109,8 @@ plain dicts in the input become instances of that class:
 
 Override `init()` (not `__init__`). Prodict calls it before applying the data you pass
 in, keyword arguments or a positional dict, so the data wins, and you never call
-`super()`:
+`super().__init__()`. (A subclass of a model that overrides `init()` again calls
+`super().init()` in it, to keep the base class's defaults.)
 
 ```python
 >>> class Settings(Prodict):

@@ -1,6 +1,7 @@
 import __future__
 import functools
 import gc
+import json
 import pickle
 import threading
 import weakref
@@ -9,7 +10,8 @@ import types
 from decimal import Decimal
 from unittest import mock
 from unittest import TestCase
-from typing import List, Any, Tuple, Dict, Optional, Union, TypedDict
+from collections import OrderedDict, UserDict
+from typing import Generic, List, Any, Tuple, Dict, Optional, TypeVar, Union, TypedDict
 import unittest
 from datetime import datetime
 import prodict
@@ -185,6 +187,22 @@ class UnresolvedRef(Prodict):
 class Recursive(Prodict):
     prodict_key: Prodict
     simple_key: SimpleKeyValue
+
+
+class KeywordNode(Prodict):
+    # a subclass whose own constructor takes the data as keyword arguments
+    child: 'KeywordNode'
+
+    def __init__(self, name=None, child=None):
+        super().__init__(name=name, child=child)
+
+
+T = TypeVar('T')
+
+
+class Page(Prodict, Generic[T]):
+    # calling Page[int](...) sets __orig_class__ on the instance
+    total: int
 
 
 class TestProdict(TestCase):
@@ -1418,11 +1436,14 @@ class TestProdict(TestCase):
             del p.items
 
     def test_dir_lists_keys(self):
-        p = Prodict({'alpha': 1, 'not-an-identifier': 2, 3: 'three'})
+        p = Prodict({'alpha': 1, 'not-an-identifier': 2, 3: 'three', 'class': 4, 'match': 5})
         names = dir(p)
         self.assertIn('alpha', names)
         self.assertIn('to_dict', names)
         self.assertNotIn('not-an-identifier', names)
+        self.assertNotIn('class', names)  # a keyword cannot follow a dot
+        self.assertIn('match', names)  # a soft keyword can
+        self.assertEqual(p.match, 5)
 
     def test_from_dict_with_other_constructors(self):
         self.assertEqual(Positional.from_dict({'x': 1}), {'x': 1})
@@ -1583,6 +1604,105 @@ class TestProdict(TestCase):
         clone = copy.copy(s)
         self.assertEqual((clone.tag, clone), ('x', {'a': 1}))
 
+    def test_dot_set_dunder_names_are_attributes(self):
+        p = Prodict(a=1)
+        p.__note__ = 'kept'
+        self.assertEqual(p, {'a': 1})  # not a key
+        self.assertEqual(p.__note__, 'kept')
+        del p.__note__
+        self.assertFalse(hasattr(p, '__note__'))
+        with self.assertRaises(TypeError):
+            p.__getitem__ = None  # the names of dict methods stay reserved
+        self.assertEqual(Prodict.__getitem__(p, 'a'), 1)
+        page = Page[int](total='2')
+        self.assertEqual(page, {'total': 2})
+        self.assertEqual(json.dumps(page), '{"total": 2}')
+        self.assertEqual(page.__orig_class__, Page[int])
+        for clone in (copy.copy(page), copy.deepcopy(page), pickle.loads(pickle.dumps(page))):
+            self.assertEqual((type(clone), clone, clone.__orig_class__), (Page, {'total': 2}, Page[int]))
+        if sys.version_info >= (3, 9):
+            self.assertEqual(Prodict[str, int](a=1), {'a': 1})
+
+    def test_unannotated_dicts_that_cannot_be_converted(self):
+        class Opaque(dict):
+            def keys(self):
+                raise RuntimeError('no keys')
+
+            def __iter__(self):
+                raise RuntimeError('no iteration')
+
+        odd = Opaque(a=1)
+        p = Prodict(x=odd)
+        self.assertIs(p.x, odd)  # stored as given
+        p.y = odd
+        self.assertIs(p.y, odd)
+        size = 3 * sys.getrecursionlimit()
+        deep = 'leaf'
+        for _ in range(size):
+            deep = {'a': deep}
+        p = Prodict.from_dict(deep)  # no RecursionError: the innermost dicts stay plain dicts
+        self.assertIs(type(p), Prodict)
+        self.assertIs(type(p.a), Prodict)
+        depth, value = 0, p
+        while isinstance(value, dict):
+            value, depth = value['a'], depth + 1
+        self.assertEqual((value, depth), ('leaf', size))
+        self.assertEqual(prodict._active(), {})  # no conversion left behind
+        loop = {}
+        loop['me'] = loop
+        p = Prodict.from_dict(loop)
+        self.assertIs(p.me, p)
+
+    def test_cycle_through_a_keyword_constructor(self):
+        d = {'name': 'loop'}
+        d['child'] = d
+        node = KeywordNode.from_dict(d)  # converted down to the recursion limit, then stored as given
+        value = node
+        while isinstance(value, KeywordNode):
+            self.assertEqual(value.name, 'loop')
+            value = value.child
+        self.assertIs(value, d)
+        self.assertEqual(prodict._active(), {})
+
+    def test_from_dict_reads_an_iterator_once(self):
+        pairs = [('a', 1), ('b', {'c': 2})]
+        for cls in (Prodict, Positional):
+            p = cls.from_dict(iter(pairs))
+            self.assertEqual(p, {'a': 1, 'b': {'c': 2}})
+            self.assertIs(type(p.b), Prodict)
+        s = Strict.from_dict(types.MappingProxyType({'a': 1}))  # any mapping goes in as keywords
+        self.assertEqual((type(s), s), (Strict, {'a': 1}))
+
+    def test_dict_operations_store_values_as_given(self):
+        class Model(Prodict):
+            n: int
+
+        m = Model(n='1')
+        nested = {'b': 1}
+        m.update(n='2', d=nested)  # dict.update: no conversion
+        self.assertEqual(m.n, '2')
+        self.assertIs(m.d, nested)
+        self.assertIs(m.setdefault('e', nested), nested)
+        self.assertIs(type(Model.fromkeys(['x'])), Model)
+        self.assertEqual(Model.fromkeys(['x'], '1'), {'n': None, 'x': '1'})
+        self.assertIs(type(m.copy()), dict)
+        self.assertEqual(json.dumps(Prodict({'items': 1})), '{"items": 1}')
+        if sys.version_info >= (3, 9):
+            merged = m | {'n': '3'}
+            self.assertEqual((type(merged), merged['n']), (dict, '3'))
+            m |= {'n': '4', 'f': nested}
+            self.assertEqual((type(m), m.n), (Model, '4'))
+            self.assertIs(m.f, nested)
+
+    def test_construction_from_any_mapping_or_pairs(self):
+        sources = (types.MappingProxyType({'a': {'b': 1}}), UserDict({'a': {'b': 1}}),
+                   OrderedDict(a={'b': 1}), [('a', {'b': 1})], zip(['a'], [{'b': 1}]),
+                   [('a', 0), ('a', {'b': 1})])
+        for data in sources:
+            p = Prodict(data)
+            self.assertEqual(p, {'a': {'b': 1}})
+            self.assertIs(type(p.a), Prodict)
+
     def test_dunder_rule(self):
         p = Prodict({'__': 1, '__x__': 2})
         self.assertEqual(p.__, 1)  # too short to be a special name
@@ -1706,6 +1826,7 @@ class TestProdict(TestCase):
     def test_bare_list_and_tuple_annotations(self):
         class Bare(Prodict):
             items: List
+            plain: list
             pair: Tuple
             pairs: Tuple[int, ...]
 
@@ -1716,6 +1837,12 @@ class TestProdict(TestCase):
         self.assertIs(b.pair, mapping)  # a mapping is stored as given, not turned into its keys
         self.assertIs(b.pairs, mapping)
         self.assertEqual(Bare(pair=5).pair, 5)
+        model = Prodict(x=1)
+        for value in (mapping, model):
+            self.assertIs(Bare(items=value)['items'], value)
+            self.assertIs(Bare(plain=value).plain, value)
+        self.assertEqual(Bare(plain=('a', 'b')).plain, ['a', 'b'])
+        self.assertEqual(Bare(plain=5).plain, 5)
 
     def test_list_items_that_already_have_the_type(self):
         class Prices(Prodict):

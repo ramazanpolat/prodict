@@ -28,7 +28,7 @@ Requires [uv](https://docs.astral.sh/uv/). No other setup:
 uv run pytest                                        # unit tests + doctests in docs/ and README.md
 for e in examples/*/main.py; do uv run python "$e"; done
 uv run --python 3.8 pytest                           # any other supported version
-uv run coverage run -m pytest && uv run coverage report   # coverage on one version
+uv run coverage run -m pytest && uv run coverage report   # one version: < 100%, CI combines all
 uvx flake8 . --select=E9,F63,F7,F82                  # the lint CI enforces
 uv build && uvx twine check dist/*                   # sdist + wheel
 ```
@@ -54,8 +54,9 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   came in positionally, sets every annotated attribute to `None`, calls the `init()` hook
   (where subclasses set defaults), then stores the positional data and the keyword
   arguments again through `_store()`, which converts them. Keyword arguments win.
-  `from_dict(d)` is `cls(d)`, or `cls(**d)` when a subclass's own `__init__` accepts the
-  data as keyword arguments (`_takes_keywords` binds it to the signature); it is typed to
+  `from_dict(d)` is `cls(d)`, or `cls(**d)` when `d` is a mapping and a subclass's own
+  `__init__` accepts it as keyword arguments (`_takes_keywords` binds it to the signature;
+  only `TypeError` / `ValueError` mean no, so a `RecursionError` propagates); it is typed to
   return `cls`. While `Prodict(d)` builds an instance it is listed, per thread, as the
   conversion of `d` (`_converting.active`), so a reference back to `d` (a cycle) becomes
   that instance; the entry is removed when the constructor ends, successful or not.
@@ -63,8 +64,10 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
 - `__getattr__` / `__setattr__` / `__delattr__` map attributes to keys. A missing key
   raises `AttributeError`, and so does any `__dunder__` name (`_is_dunder`), so that
   protocol lookups (`copy.deepcopy` asks for `__deepcopy__`) never get data.
-  `__delattr__` deletes an instance attribute or a deletable descriptor before a key.
-  `__dir__` adds the keys that are identifiers and not dunder names.
+  `__setattr__` sets a dunder name that is not a `dict` method name as an ordinary
+  attribute, never a key. `__delattr__` deletes an instance attribute or a deletable
+  descriptor before a key. `__dir__` adds the keys that are identifiers, not keywords
+  and not dunder names.
 - `attr_types()` returns the annotations of the class and its base classes, via
   `typing.get_type_hints()`, without `ClassVar` ones. If that fails, each annotation is
   resolved on its own (`_resolve`, same name lookup order) and the ones that cannot be keep
@@ -73,8 +76,9 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   that is not an identifier, and written under a lock. `has_attr()` is
   `name in attr_types()`.
 - `_store()` (used by the constructor and `set_attribute()`) converts values for
-  annotated attributes with `_convert(annotation, value)`: `int`, `float`, `str`, `list`;
-  `List[T]` / `list[T]` (item-wise); `Tuple[...]` / `tuple[...]` (to `tuple`); `dict` / `Dict[K, V]` / `dict[K, V]` and
+  annotated attributes with `_convert(annotation, value)`: `int`, `float`, `str`;
+  `list` / `List[T]` / `list[T]` (item-wise); `Tuple[...]` / `tuple[...]` (to `tuple`);
+  lists and tuples store a mapping as given; `dict` / `Dict[K, V]` / `dict[K, V]` and
   `Prodict` (plain dict to `Prodict`); Prodict subclasses (`from_dict`, unless the value
   already is an instance); `Optional[T]` / `T | None` / `Annotated[T, ...]` (as `T`).
   `List[T]` items go through `T` for any class `T` (`_convert_item`). Anything else (`Any`,
@@ -82,7 +86,9 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   is a value whose conversion call raises: an annotation never makes an assignment
   fail. `None` is never converted.
   `p['key'] = ...` and `update()` are plain dict operations and bypass conversion.
-- Unannotated plain dict values become `Prodict` instances; a Prodict is stored as it is.
+- Unannotated dict values become `Prodict` instances (through `_try`, so one that cannot
+  be converted, such as data nested past the recursion limit, is stored as given); a
+  Prodict is stored as it is.
 - Names of `dict` methods (`DICT_RESERVED_KEYS`) are accepted as keys in data, but
   `set_attribute()` / `__setattr__` / `__delattr__` refuse them (`TypeError`).
 - `__reduce__` returns the class (with `__getnewargs__` / `__getnewargs_ex__` if a
@@ -99,7 +105,10 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   `exclude_none_in_lists` (legacy). See `docs/guides/serialization.md`.
 
 Known limitations: dicts inside lists are not converted unless annotated (`List[Model]`),
-and `p['key'] = ...` / `update()` store values without conversion.
+and `p['key'] = ...` / `update()` store values without conversion. A self-containing dict
+given to a subclass whose own `__init__` takes keyword arguments is converted down to the
+recursion limit, not into a cycle (`from_dict` calls `cls(**d)`, so the instance cannot be
+registered before its data converts).
 
 ## CI
 

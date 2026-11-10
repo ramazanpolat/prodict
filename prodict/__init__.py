@@ -1,8 +1,10 @@
 # Global comments:
 # self is avoided to fix #15
+from collections.abc import Mapping
 from typing import Any, ClassVar, ForwardRef, List, Type, TypeVar, Union, get_args, get_origin, get_type_hints
 import copyreg
 import inspect
+import keyword
 import re
 import sys
 import threading
@@ -213,7 +215,9 @@ def _takes_keywords(cls, d):
         if forwarder:
             return False
         signature.bind(None, **d)
-    except Exception:
+    except (TypeError, ValueError):
+        # no signature, or the data does not bind to it; anything else, such as
+        # a RecursionError, propagates so that the caller stores the dict as given
         return False
     return True
 
@@ -241,7 +245,7 @@ def _convert(tp, value):
         return _convert(args[0], value) if len(args) == 1 else value
     if _ANNOTATED is not None and origin is _ANNOTATED:
         return _convert(get_args(tp)[0], value)
-    if tp in (int, float, str, list):
+    if tp in (int, float, str):
         return _try(tp, value)
     if tp is dict or origin is dict:
         # dict, Dict and Dict[K, V]: a plain dict becomes a Prodict; keys and
@@ -254,8 +258,8 @@ def _convert(tp, value):
             # a model whose constructor fails keeps the dict as given
             return _try(lambda v: _from_dict(tp, v), value)
         return value
-    if origin is list:
-        # List, List[T] and list[T]; a mapping is stored as given
+    if tp is list or origin is list:
+        # list, List, List[T] and list[T]; a mapping is stored as given
         if isinstance(value, dict):
             return value
         items = _try(list, value)
@@ -308,7 +312,9 @@ def _store(prodict, key, value):
     if key in types:
         value = _convert(types[key], value)
     elif isinstance(value, dict) and not isinstance(value, Prodict):
-        value = _from_dict(Prodict, value)
+        # a dict that cannot be converted (nested past the recursion limit, or
+        # one whose iteration fails) is stored as given
+        value = _try(lambda v: _from_dict(Prodict, v), value)
     dict.__setitem__(prodict, key, value)
 
 
@@ -415,8 +421,8 @@ class Prodict(dict):
 
     @classmethod
     def from_dict(cls: Type[_P], d: dict) -> _P:
-        if (cls.__init__ is not Prodict.__init__ and all(isinstance(k, str) for k in d)
-                and _takes_keywords(cls, d)):
+        if (cls.__init__ is not Prodict.__init__ and isinstance(d, Mapping)
+                and all(isinstance(k, str) for k in d) and _takes_keywords(cls, d)):
             # a subclass with its own constructor gets the data as keyword
             # arguments when it accepts them, as before 0.9
             return cls(**d)
@@ -499,7 +505,12 @@ class Prodict(dict):
             raise AttributeError(f"{type(self).__name__!r} object has no attribute {exc!s}") from None
 
     def __setattr__(self, name: str, value) -> None:
-        self.set_attribute(name, value)
+        if _is_dunder(name) and name not in DICT_RESERVED_KEYS:
+            # names Python sets for itself (__orig_class__, __class__, ...) are
+            # attributes, never keys, like they are never read as keys
+            object.__setattr__(self, name, value)
+        else:
+            self.set_attribute(name, value)
 
     def __delattr__(self, name: str) -> None:
         if name in DICT_RESERVED_KEYS:
@@ -525,7 +536,8 @@ class Prodict(dict):
 
     def __dir__(self):
         # keys that work as attributes, for completion in a REPL or notebook
-        keys = [k for k in dict.keys(self) if isinstance(k, str) and k.isidentifier() and not _is_dunder(k)]
+        keys = [k for k in dict.keys(self)
+                if isinstance(k, str) and k.isidentifier() and not keyword.iskeyword(k) and not _is_dunder(k)]
         return sorted(set(super().__dir__()) | set(keys))
 
     def to_dict(
