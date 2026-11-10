@@ -10,6 +10,11 @@ print(p['pros'])  # Rocks!
 p.year = 1991
 print(p)  # {'lang': 'Python', 'pros': 'Rocks!', 'year': 1991}
 
+# Deleting an attribute deletes the key.
+p.draft = True
+del p.draft
+assert 'draft' not in p
+
 # It is a real dict: equality, isinstance and every dict method still work.
 assert p == {'lang': 'Python', 'pros': 'Rocks!', 'year': 1991}
 assert isinstance(p, dict)

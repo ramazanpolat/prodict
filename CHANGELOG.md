@@ -6,6 +6,12 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-10
+
+Prodict becomes lenient and more dict-like: an annotation converts a value when it can
+and stores it as given when it cannot, and a Prodict accepts any data a `dict` accepts.
+See *Upgrading from 0.8* in the README for what you may notice.
+
 ### Added
 
 - `from_dict()` is typed to return the class it is called on, so an IDE completes the
@@ -14,6 +20,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   or notebook can complete them.
 - Issue forms for bug reports and feature requests, a pull request template, and
   `SECURITY.md`, which points to GitHub's private vulnerability reporting.
+- CI requires 100% line and branch coverage of the library, combined over every
+  supported Python version, before anything is published.
 
 ### Changed
 
@@ -156,7 +164,8 @@ Versions 0.7 to 0.8.18 (2018 to 2021) are listed in the
 [PyPI release history](https://pypi.org/project/prodict/#history). Earlier versions exist
 only as git tags (`v0.1` to `v0.6`).
 
-[Unreleased]: https://github.com/ramazanpolat/prodict/compare/v0.8.23...HEAD
+[Unreleased]: https://github.com/ramazanpolat/prodict/compare/v0.9.0...HEAD
+[0.9.0]: https://pypi.org/project/prodict/0.9.0/
 [0.8.23]: https://pypi.org/project/prodict/0.8.23/
 [0.8.22]: https://pypi.org/project/prodict/0.8.22/
 [0.8.21]: https://pypi.org/project/prodict/0.8.21/

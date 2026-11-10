@@ -69,6 +69,15 @@ they are set. Attributes you did not pass exist with the value `None`:
 
 ```
 
+An annotation is a convenience, not validation. A value Prodict cannot convert is stored
+as given, so messy data never makes a model fail:
+
+```python
+>>> Country(name='Atlantis', population='unknown').population
+'unknown'
+
+```
+
 ## 4. Nest models
 
 Annotate an attribute with another Prodict subclass, or with `List[...]` of one, and

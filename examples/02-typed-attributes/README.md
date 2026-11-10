@@ -7,6 +7,7 @@ What it shows:
 
 - `"83200000"` becomes the `int` `83200000` and `"357588"` the `float` `357588.0`;
 - conversion also runs on later assignments;
+- a value that cannot be converted (`"unknown"` for an `int`) is stored as given;
 - annotated attributes that were not given exist with the value `None`;
 - `Any` turns conversion off while keeping completion;
 - keys without an annotation are stored as they are, except that dicts become Prodicts.

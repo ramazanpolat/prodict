@@ -17,7 +17,7 @@ pip resolves to 0.8.22, the last version that declares 3.7 support.
 | `docs/` | Tutorial and guides. Every `>>>` block is a doctest, as in `README.md`. |
 | `examples/NN-name/` | Runnable `main.py` plus a README showing its exact output. |
 | `pyproject.toml` | Metadata, hatchling build, `dev` dependency group, pytest config. |
-| `.github/workflows/pythonapp.yml` | CI: `test` matrix, `build`, `deploy`. |
+| `.github/workflows/pythonapp.yml` | CI: `test` matrix, combined `coverage`, `build`, `deploy`. |
 | `CHANGELOG.md` | Keep a Changelog format; new entries go under `Unreleased`. |
 
 ## Install and run
