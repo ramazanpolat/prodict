@@ -23,6 +23,10 @@ assert germany.raw == '83200000'  # Any keeps the value as it came
 germany.population = '84000000'
 assert germany.population == 84000000
 
+# A value that cannot be converted is stored as given: annotations never reject data.
+nowhere = Country(name='Nowhere', population='unknown')
+assert nowhere.population == 'unknown'
+
 # Annotated attributes that were not given are present with the value None.
 turkey = Country(name='Turkey')
 print(turkey)  # {'name': 'Turkey', 'population': None, 'area_km2': None, 'raw': None}

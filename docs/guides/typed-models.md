@@ -54,7 +54,8 @@ The built-in generics `list[T]`, `tuple[...]` and `dict[K, V]` (Python 3.9+) wor
 `List[T]`, `Tuple[...]` and `Dict[K, V]`, `T | None` (Python 3.10+) like
 `Optional[T]`, and `Annotated[T, ...]` like `T`. A value that is already an instance of the annotated model is stored as it
 is, not copied. `Dict[K, V]` does not convert keys and values to `K` and `V`; annotate
-with a Prodict subclass for that.
+with a Prodict subclass for that. A mapping given to `list`, `List[T]` or `Tuple[...]` is
+stored as given rather than turned into a list of its keys.
 
 ```python
 >>> p = Product(name=7, price='9.5', stock='42', tags=('a', 'b'), extra='42')
@@ -196,7 +197,8 @@ pass in (keyword arguments or a positional dict) is applied, so the data wins:
   can be set, but reading them with a dot still returns the method; only `p['to_dict']`
   reaches the value. Avoid them.
 - **Names like `__deepcopy__`**, with two leading and trailing underscores, belong to
-  Python's own protocols: as keys they are only reachable with brackets.
+  Python's own protocols: as keys they are only reachable with brackets, and setting one
+  with a dot sets an ordinary attribute, not a key.
 - **Keys that are not valid identifiers** (`'1'`, `'first-name'`) cannot be reached with a
   dot, but still work with brackets or `set_attribute()`:
 

@@ -6,6 +6,13 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-10
+
+Prodict becomes lenient and more dict-like: an annotation converts a value when it can
+and stores it as given when it cannot, and a Prodict takes the same data a `dict` takes:
+keys of any kind, a positional dict or pairs, and keyword arguments.
+See *Upgrading from 0.8* in the README for what you may notice.
+
 ### Added
 
 - `from_dict()` is typed to return the class it is called on, so an IDE completes the
@@ -14,6 +21,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   or notebook can complete them.
 - Issue forms for bug reports and feature requests, a pull request template, and
   `SECURITY.md`, which points to GitHub's private vulnerability reporting.
+- CI requires 100% line and branch coverage of the library, combined over every
+  supported Python version, before anything is published.
 
 ### Changed
 
@@ -32,7 +41,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   the data as keyword arguments): a positional dict, keyword arguments and `from_dict()`
   are treated the same way.
 - A dict that contains itself becomes a Prodict that contains itself, instead of raising
-  `RecursionError`.
+  `RecursionError`. Through a subclass whose own `__init__` takes the data as keyword
+  arguments, it is converted down to Python's recursion limit and stored as given below.
 - A nested model whose constructor raises keeps its dict as given, like any other value
   that cannot be converted.
 - `copy`, `copy.deepcopy()` and `pickle` restore the data as it is stored: `init()` does
@@ -40,11 +50,15 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   kept.
 - Names of the form `__name__` are never looked up as keys by attribute access, so a key
   such as `__deepcopy__` cannot stand in for a Python protocol hook; read it with
-  brackets.
+  brackets. Set with a dot (`p.__note__ = 1`), such a name is an ordinary attribute, not
+  a key, so a `Generic` model called as `Page[int](...)` no longer gets an
+  `__orig_class__` key and `json.dumps()` works on it.
 - `ClassVar` annotations are left out of the model: they no longer appear in every
   instance as `None`.
 - `Annotated[T, ...]` annotations convert as `T`.
 - The internal `get_constructor()` method is gone; `set_attribute()` converts values.
+- A model class keeps its collected annotations in its own `attr_types`, so `dir()` of a
+  class or an instance lists no internal names, and the cache is freed with the class.
 
 ### Fixed
 
@@ -53,7 +67,8 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   ([#38](https://github.com/ramazanpolat/prodict/issues/38)). Unions of several types store
   values as given instead of raising `AttributeError` on Python 3.14+.
 - The built-in generics `list[T]`, `tuple[...]` and `dict[K, V]` work like `List[T]`,
-  `Tuple[...]` and `Dict[K, V]` instead of raising `KeyError` or `TypeError`
+  `Tuple[...]` and `Dict[K, V]` instead of raising `KeyError` or `TypeError`, or storing
+  values unconverted
   ([#21](https://github.com/ramazanpolat/prodict/issues/21)).
 - `List[Any]`, `List[Optional[T]]` and other lists of non-class types no longer raise
   `TypeError`.
@@ -78,6 +93,11 @@ published on [PyPI](https://pypi.org/project/prodict/#history).
   ([#57](https://github.com/ramazanpolat/prodict/issues/57)).
 - `set_default(name)` stores the class attribute `name` as the key's value instead of
   raising `AttributeError`.
+- A bare `list` annotation stores a mapping as given, like `List`, instead of turning it
+  into a list of its keys.
+- A dict that cannot be converted to a Prodict, such as data nested deeper than Python's
+  recursion limit or a dict subclass whose iteration fails, is stored as given instead
+  of raising `RecursionError` or the subclass's error.
 
 ## [0.8.23] - 2026-10-27
 
@@ -156,7 +176,8 @@ Versions 0.7 to 0.8.18 (2018 to 2021) are listed in the
 [PyPI release history](https://pypi.org/project/prodict/#history). Earlier versions exist
 only as git tags (`v0.1` to `v0.6`).
 
-[Unreleased]: https://github.com/ramazanpolat/prodict/compare/v0.8.23...HEAD
+[Unreleased]: https://github.com/ramazanpolat/prodict/compare/v0.9.0...HEAD
+[0.9.0]: https://pypi.org/project/prodict/0.9.0/
 [0.8.23]: https://pypi.org/project/prodict/0.8.23/
 [0.8.22]: https://pypi.org/project/prodict/0.8.22/
 [0.8.21]: https://pypi.org/project/prodict/0.8.21/

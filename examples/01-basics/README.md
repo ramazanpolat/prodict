@@ -6,6 +6,7 @@ What it shows:
 
 - keyword arguments and `Prodict.from_dict()` both build one;
 - `p.key` and `p['key']` are the same value, and the object still compares equal to a plain dict;
+- `del p.key` deletes the key;
 - nested dicts become `Prodict` instances, so `config.db.host` works;
 - a missing attribute raises `AttributeError`, so `getattr(p, 'name', default)` behaves as usual.
 

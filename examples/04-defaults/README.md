@@ -1,8 +1,9 @@
 # 04 - Default values
 
 Override `init()` (not `__init__`) to set defaults. Prodict calls it from its own
-constructor before applying the keyword arguments you passed, so you never call `super()`
-and keyword arguments always win over defaults.
+constructor before applying the keyword arguments you passed, so you never call
+`super().__init__()` and keyword arguments always win over defaults. A subclass that
+overrides `init()` again calls `super().init()` to keep its base class's defaults.
 
 What it shows:
 

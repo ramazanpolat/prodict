@@ -69,6 +69,15 @@ they are set. Attributes you did not pass exist with the value `None`:
 
 ```
 
+An annotation is a convenience, not validation. A value Prodict cannot convert is stored
+as given, so messy data never makes a model fail:
+
+```python
+>>> Country(name='Atlantis', population='unknown').population
+'unknown'
+
+```
+
 ## 4. Nest models
 
 Annotate an attribute with another Prodict subclass, or with `List[...]` of one, and
@@ -100,7 +109,8 @@ plain dicts in the input become instances of that class:
 
 Override `init()` (not `__init__`). Prodict calls it before applying the data you pass
 in, keyword arguments or a positional dict, so the data wins, and you never call
-`super()`:
+`super().__init__()`. (A subclass of a model that overrides `init()` again calls
+`super().init()` in it, to keep the base class's defaults.)
 
 ```python
 >>> class Settings(Prodict):

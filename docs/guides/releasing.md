@@ -5,16 +5,17 @@ Releases are published by CI. Merging to `master` publishes to PyPI exactly when
 
 ## Steps
 
-1. Bump `version` in `pyproject.toml` (for example `0.8.22` to `0.8.23`).
+1. Bump `version` in `pyproject.toml` (for example `0.8.23` to `0.9.0`).
 2. Move the `Unreleased` entries in `CHANGELOG.md` under a heading for the new version
    and date.
-3. Open a pull request. CI runs the test matrix and builds the distribution.
-4. Merge to `master`. The `deploy` job then:
+3. Open a pull request. CI runs the test matrix, checks that the coverage of every
+   Python version combined is 100% (lines and branches), and builds the distribution.
+4. Merge to `master`. Once `test`, `coverage` and `build` pass, the `deploy` job:
    - builds the sdist and wheel and runs `twine check`;
    - asks PyPI whether the version exists, and stops here if it does;
    - uploads to TestPyPI, then to PyPI.
 5. Once the version is on PyPI, tag the commit that published it: the merge commit of the
-   release pull request, whose `deploy` log says `prodict 0.8.23 is new; publishing`.
+   release pull request, whose `deploy` log says `prodict 0.9.0 is new; publishing`.
    Push the tag and create a GitHub release from the changelog section (recommended; CI
    does not need either). Name the commit explicitly, so the tag cannot land on a local
    branch head or on a later master commit:
@@ -22,13 +23,14 @@ Releases are published by CI. Merging to `master` publishes to PyPI exactly when
    ```bash
    gh pr view <release-pr> --json mergeCommit --jq .mergeCommit.oid
    git fetch origin
-   git tag -a v0.8.23 <merge-commit> -m "prodict 0.8.23"
-   git push origin v0.8.23
-   gh release create v0.8.23 --title "prodict 0.8.23" --notes-file notes.md
+   git tag -a v0.9.0 <merge-commit> -m "prodict 0.9.0"
+   git push origin v0.9.0
+   gh release create v0.9.0 --title "prodict 0.9.0" --notes-file notes.md
    ```
 
-A push to `master` that does not change the version publishes nothing, so documentation
-and CI changes can be merged at any time.
+A push to `master` publishes only when its version is not on PyPI yet. Once a release is
+on PyPI, documentation and CI changes can be merged at any time; while a release's
+`deploy` has not uploaded it, the next push to `master` would publish it instead.
 
 ## Credentials
 

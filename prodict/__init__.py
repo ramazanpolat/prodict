@@ -1,8 +1,10 @@
 # Global comments:
 # self is avoided to fix #15
+from collections.abc import Mapping
 from typing import Any, ClassVar, ForwardRef, List, Type, TypeVar, Union, get_args, get_origin, get_type_hints
 import copyreg
 import inspect
+import keyword
 import re
 import sys
 import threading
@@ -55,11 +57,17 @@ try:
 except ImportError:
     annotationlib = None
 
-# the class attribute that holds a model's annotations, collected over its
-# class hierarchy: (annotations, {name: (owner class, annotation)} not resolved yet).
-# Not an identifier, so it can never hide a key from attribute access.
-_ATTR_TYPES = 'prodict:attr_types'
 _attr_types_lock = threading.RLock()
+
+
+class _AttrTypes(classmethod):
+    # attr_types() as stored in one model class, together with that class's
+    # annotations collected over its class hierarchy, once known:
+    # (annotations, {name: (owner class, annotation)} not resolved yet).
+    # Kept under the name attr_types, which dir() lists anyway, so the cache
+    # adds no name to dir() and is freed with the class.
+    entry = None
+
 
 # ClassVar, bare or subscripted, written as a string, with what precedes it
 # (typing., an alias such as t., or nothing)
@@ -213,7 +221,9 @@ def _takes_keywords(cls, d):
         if forwarder:
             return False
         signature.bind(None, **d)
-    except Exception:
+    except (TypeError, ValueError):
+        # no signature, or the data does not bind to it; anything else, such as
+        # a RecursionError, propagates so that the caller stores the dict as given
         return False
     return True
 
@@ -241,7 +251,7 @@ def _convert(tp, value):
         return _convert(args[0], value) if len(args) == 1 else value
     if _ANNOTATED is not None and origin is _ANNOTATED:
         return _convert(get_args(tp)[0], value)
-    if tp in (int, float, str, list):
+    if tp in (int, float, str):
         return _try(tp, value)
     if tp is dict or origin is dict:
         # dict, Dict and Dict[K, V]: a plain dict becomes a Prodict; keys and
@@ -254,8 +264,8 @@ def _convert(tp, value):
             # a model whose constructor fails keeps the dict as given
             return _try(lambda v: _from_dict(tp, v), value)
         return value
-    if origin is list:
-        # List, List[T] and list[T]; a mapping is stored as given
+    if tp is list or origin is list:
+        # list, List, List[T] and list[T]; a mapping is stored as given
         if isinstance(value, dict):
             return value
         items = _try(list, value)
@@ -308,7 +318,9 @@ def _store(prodict, key, value):
     if key in types:
         value = _convert(types[key], value)
     elif isinstance(value, dict) and not isinstance(value, Prodict):
-        value = _from_dict(Prodict, value)
+        # a dict that cannot be converted (nested past the recursion limit, or
+        # one whose iteration fails) is stored as given
+        value = _try(lambda v: _from_dict(Prodict, v), value)
     dict.__setitem__(prodict, key, value)
 
 
@@ -415,8 +427,8 @@ class Prodict(dict):
 
     @classmethod
     def from_dict(cls: Type[_P], d: dict) -> _P:
-        if (cls.__init__ is not Prodict.__init__ and all(isinstance(k, str) for k in d)
-                and _takes_keywords(cls, d)):
+        if (cls.__init__ is not Prodict.__init__ and isinstance(d, Mapping)
+                and all(isinstance(k, str) for k in d) and _takes_keywords(cls, d)):
             # a subclass with its own constructor gets the data as keyword
             # arguments when it accepts them, as before 0.9
             return cls(**d)
@@ -437,22 +449,28 @@ class Prodict(dict):
     def attr_type(cls, attr_name: str):
         return cls.attr_types()[attr_name]
 
-    @classmethod
+    @_AttrTypes
     def attr_types(cls):
         """
         Returns the annotations of the class and its base classes. String
         annotations are resolved where possible; ClassVar annotations are left
         out.
         """
-        entry = cls.__dict__.get(_ATTR_TYPES)
+        stored = cls.__dict__.get('attr_types')
+        entry = stored.entry if isinstance(stored, _AttrTypes) else None
         if entry is None or entry[1]:
             with _attr_types_lock:
-                entry = cls.__dict__.get(_ATTR_TYPES)
+                stored = cls.__dict__.get('attr_types')
+                entry = stored.entry if isinstance(stored, _AttrTypes) else None
                 if entry is None:
                     entry = _collect_annotations(cls)
                 elif entry[1]:
                     entry = _retry_unresolved(*entry)
-                setattr(cls, _ATTR_TYPES, entry)
+                if stored is None or isinstance(stored, _AttrTypes):
+                    # a class that defines its own attr_types keeps it, without a cache
+                    stored = _AttrTypes(Prodict.__dict__['attr_types'].__func__)
+                    stored.entry = entry
+                    setattr(cls, 'attr_types', stored)
         return entry[0]
 
     @classmethod
@@ -499,7 +517,12 @@ class Prodict(dict):
             raise AttributeError(f"{type(self).__name__!r} object has no attribute {exc!s}") from None
 
     def __setattr__(self, name: str, value) -> None:
-        self.set_attribute(name, value)
+        if _is_dunder(name) and name not in DICT_RESERVED_KEYS:
+            # names Python sets for itself (__orig_class__, __class__, ...) are
+            # attributes, never keys, like they are never read as keys
+            object.__setattr__(self, name, value)
+        else:
+            self.set_attribute(name, value)
 
     def __delattr__(self, name: str) -> None:
         if name in DICT_RESERVED_KEYS:
@@ -525,7 +548,8 @@ class Prodict(dict):
 
     def __dir__(self):
         # keys that work as attributes, for completion in a REPL or notebook
-        keys = [k for k in dict.keys(self) if isinstance(k, str) and k.isidentifier() and not _is_dunder(k)]
+        keys = [k for k in dict.keys(self)
+                if isinstance(k, str) and k.isidentifier() and not keyword.iskeyword(k) and not _is_dunder(k)]
         return sorted(set(super().__dir__()) | set(keys))
 
     def to_dict(

@@ -11,7 +11,7 @@ body:
     attributes:
       label: prodict version
       description: Shown by `pip show prodict`.
-      placeholder: 0.8.23
+      placeholder: 0.9.0
     validations:
       required: true
   - type: input
