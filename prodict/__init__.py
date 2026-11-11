@@ -57,11 +57,17 @@ try:
 except ImportError:
     annotationlib = None
 
-# the class attribute that holds a model's annotations, collected over its
-# class hierarchy: (annotations, {name: (owner class, annotation)} not resolved yet).
-# Not an identifier, so it can never hide a key from attribute access.
-_ATTR_TYPES = 'prodict:attr_types'
 _attr_types_lock = threading.RLock()
+
+
+class _AttrTypes(classmethod):
+    # attr_types() as stored in one model class, together with that class's
+    # annotations collected over its class hierarchy, once known:
+    # (annotations, {name: (owner class, annotation)} not resolved yet).
+    # Kept under the name attr_types, which dir() lists anyway, so the cache
+    # adds no name to dir() and is freed with the class.
+    entry = None
+
 
 # ClassVar, bare or subscripted, written as a string, with what precedes it
 # (typing., an alias such as t., or nothing)
@@ -443,22 +449,28 @@ class Prodict(dict):
     def attr_type(cls, attr_name: str):
         return cls.attr_types()[attr_name]
 
-    @classmethod
+    @_AttrTypes
     def attr_types(cls):
         """
         Returns the annotations of the class and its base classes. String
         annotations are resolved where possible; ClassVar annotations are left
         out.
         """
-        entry = cls.__dict__.get(_ATTR_TYPES)
+        stored = cls.__dict__.get('attr_types')
+        entry = stored.entry if isinstance(stored, _AttrTypes) else None
         if entry is None or entry[1]:
             with _attr_types_lock:
-                entry = cls.__dict__.get(_ATTR_TYPES)
+                stored = cls.__dict__.get('attr_types')
+                entry = stored.entry if isinstance(stored, _AttrTypes) else None
                 if entry is None:
                     entry = _collect_annotations(cls)
                 elif entry[1]:
                     entry = _retry_unresolved(*entry)
-                setattr(cls, _ATTR_TYPES, entry)
+                if stored is None or isinstance(stored, _AttrTypes):
+                    # a class that defines its own attr_types keeps it, without a cache
+                    stored = _AttrTypes(Prodict.__dict__['attr_types'].__func__)
+                    stored.entry = entry
+                    setattr(cls, 'attr_types', stored)
         return entry[0]
 
     @classmethod

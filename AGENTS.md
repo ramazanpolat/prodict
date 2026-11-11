@@ -72,9 +72,10 @@ Without uv: `pip install -e . --group dev` (pip 25.1+, Python 3.9+; on 3.8
   `typing.get_type_hints()`, without `ClassVar` ones. If that fails, each annotation is
   resolved on its own (`_resolve`, same name lookup order) and the ones that cannot be keep
   their raw form (`annotationlib` on 3.14+); later calls retry them, so a forward reference
-  converts once its class exists. The result is stored on the class itself, under a name
-  that is not an identifier, and written under a lock. `has_attr()` is
-  `name in attr_types()`.
+  converts once its class exists. The result is stored in the class's own `attr_types`
+  entry (`_AttrTypes`, a `classmethod` that also holds it), written under a lock, so the
+  cache adds no name to `dir()` and is freed with the class. A class that defines its own
+  `attr_types` keeps it, without a cache. `has_attr()` is `name in attr_types()`.
 - `_store()` (used by the constructor and `set_attribute()`) converts values for
   annotated attributes with `_convert(annotation, value)`: `int`, `float`, `str`;
   `list` / `List[T]` / `list[T]` (item-wise); `Tuple[...]` / `tuple[...]` (to `tuple`);

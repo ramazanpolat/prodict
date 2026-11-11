@@ -1445,6 +1445,63 @@ class TestProdict(TestCase):
         self.assertIn('match', names)  # a soft keyword can
         self.assertEqual(p.match, 5)
 
+    def test_dir_matches_0_8_23(self):
+        # what a Prodict class adds to a plain dict subclass, as of 0.8.23 (with
+        # __getstate__, which object also has from Python 3.11)
+        names_0_8_23 = {
+            '__deepcopy__', '__getattr__', '__getstate__', '__setstate__',
+            'attr_has_default_value', 'attr_names', 'attr_type', 'attr_types', 'from_dict',
+            'get_attr_default_value', 'get_constructor', 'has_attr', 'init', 'set_attribute',
+            'set_attributes', 'set_default', 'to_dict'}
+        # removed on purpose in 0.9.0: get_constructor() (see the changelog), and the
+        # copy hooks that __reduce__ replaced. Nothing was added to the class.
+        removed_in_0_9 = {'get_constructor', '__deepcopy__', '__getstate__'}
+        # names Python itself adds to a class whose annotations were read; they
+        # differ by version and by how the annotations were read
+        python_annotation_names = {'__annotations__', '__annotate__', '__annotate_func__',
+                                   '__annotations_cache__'}
+
+        class Plain(dict):
+            pass
+
+        class PlainModel(Plain):
+            n: int
+
+        class Model(Prodict):
+            n: int
+
+        model, p = Model(n='1'), Prodict(a=1)
+        Prodict.attr_types()
+        for name, obj, plain, keys in (('Prodict', Prodict, Plain, set()),
+                                       ('Model', Model, PlainModel, set()),
+                                       ('Prodict(a=1)', p, Plain, {'a'}),
+                                       ('Model(n=1)', model, PlainModel, {'n'})):
+            with self.subTest(name):
+                names = set(dir(obj))
+                self.assertNotIn('prodict:attr_types', names)
+                self.assertEqual([n for n in names if not n.isidentifier()], [])
+                # the keys of an instance are the one addition: dir() lists them since 0.9.0
+                expected = set(dir(plain)) | (names_0_8_23 - removed_in_0_9) | keys
+                self.assertEqual(names - python_annotation_names, expected - python_annotation_names)
+
+    def test_own_attr_types_is_kept(self):
+        # a class that defines its own attr_types() keeps it; the annotations are
+        # then collected on every call instead of being stored
+        class Own(Prodict):
+            n: int
+
+            @classmethod
+            def attr_types(cls):
+                return dict(super().attr_types(), extra=str)
+
+        own = Own(n='1', extra=2)
+        self.assertEqual((own.n, own.extra), (1, '2'))
+        self.assertNotIsInstance(Own.__dict__['attr_types'], prodict._AttrTypes)
+        with mock.patch.object(prodict, '_collect_annotations', wraps=prodict._collect_annotations) as collect:
+            self.assertEqual(Own.attr_types(), {'n': int, 'extra': str})
+            self.assertEqual(Own.attr_types(), {'n': int, 'extra': str})
+        self.assertEqual(collect.call_count, 2)
+
     def test_from_dict_with_other_constructors(self):
         self.assertEqual(Positional.from_dict({'x': 1}), {'x': 1})
         self.assertEqual(Positional.from_dict({'x': 1, 1: 'one'}), {'x': 1, 1: 'one'})

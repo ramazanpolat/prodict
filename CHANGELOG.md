@@ -57,6 +57,8 @@ See *Upgrading from 0.8* in the README for what you may notice.
   instance as `None`.
 - `Annotated[T, ...]` annotations convert as `T`.
 - The internal `get_constructor()` method is gone; `set_attribute()` converts values.
+- A model class keeps its collected annotations in its own `attr_types`, so `dir()` of a
+  class or an instance lists no internal names, and the cache is freed with the class.
 
 ### Fixed
 
